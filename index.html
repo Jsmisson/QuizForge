@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="QuizForge">
@@ -589,7 +590,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 // ═══════════════════════════════════════════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    navigator.serviceWorker.register('./sw3.js').catch(()=>{});
   });
 }
 let _deferredInstall=null;
@@ -695,6 +696,9 @@ function renderHeader(){
 }
 
 function renderSetsGrid(){
+  // Always remove legacy fallback button if present
+  const fb=document.getElementById('createSetFallback');
+  if(fb) fb.remove();
   const sets=loadSets();
   const grid=document.getElementById('setsGrid');
   if(!grid) return;
