@@ -588,10 +588,9 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 // ═══════════════════════════════════════════════════
 //  PWA — Service Worker + Install prompt
 // ═══════════════════════════════════════════════════
-// Kill any old service workers
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(regs=>{
-    regs.forEach(reg=>reg.unregister());
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw3.js').catch(()=>{});
   });
 }
 let _deferredInstall=null;
@@ -952,12 +951,12 @@ function exportCurrentSet(){
   if(!activeSetId||!questions.length) return alert('No questions to export.');
   const sets=loadSets(), s=sets.find(x=>x.id===activeSetId);
   const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions,flaggedKeys};
-  dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.qforge`);
+  dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
 function exportAll(){
   const sets=loadSets(); if(!sets.length) return showHomeMsg('No sets to export.',false);
   const payload={version:2,exported:new Date().toISOString(),sets:sets.map(s=>({id:s.id,name:s.name,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)}))};
-  dlBlob(JSON.stringify(payload,null,2),`quizforge-all-${new Date().toISOString().slice(0,10)}.qforge`);
+  dlBlob(JSON.stringify(payload,null,2),`quizforge-all-${new Date().toISOString().slice(0,10)}.json`);
   showHomeMsg(`✓ Exported ${sets.length} set(s).`,true);
 }
 function importBank(evt){
@@ -971,7 +970,7 @@ function importBank(evt){
         data.sets.forEach(sd=>{ const newId=uid(); existing.push({id:newId,name:sd.name||'Imported Set',created:sd.created||Date.now()}); saveQs(newId,Array.isArray(sd.questions)?sd.questions:[]); saveFlags(newId,Array.isArray(sd.flaggedKeys)?sd.flaggedKeys:[]); setsAdded++; qAdded+=(sd.questions||[]).length; });
         saveSets(existing); showHomeMsg(`✓ Imported ${setsAdded} set(s) with ${qAdded} question(s).`,true);
       } else if(data.questions&&Array.isArray(data.questions)){
-        const existing=loadSets(), newId=uid(), name=(data.setName||file.name.replace(/\.qforge$/,'')||'Imported Set').trim();
+        const existing=loadSets(), newId=uid(), name=(data.setName||file.name.replace(/\.(qforge|json)$/,'')||'Imported Set').trim();
         existing.push({id:newId,name,created:Date.now()}); saveQs(newId,data.questions); saveFlags(newId,Array.isArray(data.flaggedKeys)?data.flaggedKeys:[]); saveSets(existing);
         showHomeMsg(`✓ Created "${name}" with ${data.questions.length} question(s).`,true);
       } else throw new Error();
