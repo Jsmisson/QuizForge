@@ -588,9 +588,10 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 // ═══════════════════════════════════════════════════
 //  PWA — Service Worker + Install prompt
 // ═══════════════════════════════════════════════════
+// Kill any old service workers
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw3.js').catch(()=>{});
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(reg=>reg.unregister());
   });
 }
 let _deferredInstall=null;
