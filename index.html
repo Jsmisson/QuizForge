@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="QuizForge">
+<meta name="theme-color" content="#0a0c12">
+<title>QuizForge</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230a0c12'/><text x='96' y='130' font-size='110' text-anchor='middle' font-family='sans-serif' fill='%2300e5ff'>Q</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c12; --surface:#111520; --surface2:#181d2e; --border:#252d45;
+  --accent:#00e5ff; --green:#00e676; --red:#ff5252; --yellow:#ffd740;
+  --orange:#ff9100; --text:#e8ecf5; --muted:#6b7a99; --radius:12px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+  --tap: 44px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'Sora',sans-serif;min-height:100%;overflow-x:hidden;
+  padding-top:var(--safe-top);padding-bottom:var(--safe-bot)}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0}
+#app{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:20px 16px 80px}
+
+/* ── Typography scale ── */
+h1{font-size:clamp(1.1rem,4vw,1.4rem)}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:10px}
+.logo{font-size:clamp(1.2rem,5vw,1.4rem);font-weight:800;letter-spacing:-.5px;cursor:pointer;user-select:none}
+.logo span{color:var(--accent)}
+.header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);min-width:0}
+.breadcrumb .sep{opacity:.4;flex-shrink:0}
+.breadcrumb .set-name{color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(160px,40vw)}
+
+/* ── Buttons ── */
+.btn{font-family:'Sora',sans-serif;font-size:.8rem;font-weight:700;padding:9px 16px;
+  border-radius:8px;border:none;cursor:pointer;transition:all .18s;letter-spacing:.4px;
+  text-transform:uppercase;min-height:var(--tap);display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  -webkit-touch-callout:none;user-select:none}
+.btn-primary{background:var(--accent);color:#000}
+.btn-primary:active{background:#33ecff;transform:scale(.97)}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+.btn-ghost:active{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--red)}
+.btn-danger:active{background:var(--red);color:#fff}
+.btn-flag{background:transparent;color:var(--yellow);border:1px solid rgba(255,215,64,.4);font-size:.75rem;padding:7px 14px}
+.btn-flag.flagged{background:rgba(255,215,64,.15);border-color:var(--yellow)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-sm{padding:7px 12px;font-size:.72rem;min-height:36px}
+@media(hover:hover){
+  .btn-primary:hover{background:#33ecff;transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,229,255,.3)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-danger:hover{background:var(--red);color:#fff}
+  .btn-flag:hover{background:rgba(255,215,64,.1)}
+}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.card-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:14px}
+
+/* ── Tabs ── */
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:var(--surface2);
+  border-radius:10px;padding:4px;margin-bottom:20px}
+.tab{padding:10px 4px;border-radius:7px;border:none;cursor:pointer;font-family:'Sora',sans-serif;
+  font-size:clamp(.65rem,.9rem + .2vw,.82rem);font-weight:600;background:transparent;color:var(--muted);
+  transition:all .18s;min-height:var(--tap);display:flex;align-items:center;justify-content:center;
+  text-align:center;line-height:1.2;user-select:none}
+.tab.active{background:var(--surface);color:var(--accent);box-shadow:0 0 0 1px var(--border)}
+@media(hover:hover){.tab:hover:not(.active){color:var(--text)}}
+
+/* ── Views ── */
+.view{display:none}
+.view.active{display:block}
+
+/* ══ SETS DASHBOARD ══ */
+.sets-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px}
+.sets-header-text h2{font-size:1rem;font-weight:700;margin-bottom:3px}
+.sets-header-text p{font-size:.78rem;color:var(--muted)}
+.sets-header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:12px;margin-bottom:16px}
+.set-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px;cursor:pointer;transition:all .18s;position:relative;min-height:100px}
+.set-card:active{border-color:var(--accent);transform:scale(.98)}
+@media(hover:hover){.set-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,229,255,.1)}}
+.set-card.active-set{border-color:var(--accent);background:rgba(0,229,255,.04)}
+.set-card-name{font-size:.95rem;font-weight:700;margin-bottom:5px;padding-right:60px;word-break:break-word;line-height:1.3}
+.set-card-meta{font-size:.7rem;color:var(--muted)}
+.set-card-actions{position:absolute;top:10px;right:10px;display:flex;gap:2px;opacity:1}
+.set-card-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:10px;
+  text-transform:uppercase;letter-spacing:.5px;background:rgba(0,229,255,.12);color:var(--accent);
+  border:1px solid rgba(0,229,255,.2);margin-top:5px}
+.new-set-card{background:transparent;border:2px dashed var(--border);border-radius:var(--radius);
+  padding:18px;cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;min-height:100px;color:var(--muted);font-size:.82rem;font-weight:600}
+.new-set-card:active{border-color:var(--accent);color:var(--accent)}
+@media(hover:hover){.new-set-card:hover{border-color:var(--accent);color:var(--accent)}}
+.new-set-card .plus{font-size:1.6rem;line-height:1}
+.set-name-input{background:var(--surface);border:1px solid var(--accent);border-radius:6px;color:var(--text);
+  font-family:'Sora',sans-serif;font-size:.9rem;font-weight:700;padding:3px 8px;width:100%;outline:none;
+  min-height:32px}
+
+/* ══ QUESTION EDITOR ══ */
+.q-form{display:flex;flex-direction:column;gap:14px}
+.q-form label{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px}
+.q-form input,.q-form textarea,.q-form select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font-family:'Sora',sans-serif;font-size:1rem;padding:12px 14px;outline:none;
+  transition:border-color .18s;-webkit-appearance:none;appearance:none}
+.q-form input:focus,.q-form textarea:focus,.q-form select:focus{border-color:var(--accent)}
+.q-form textarea{resize:vertical;min-height:90px}
+.options-builder{display:flex;flex-direction:column;gap:10px}
+.option-row{display:flex;align-items:center;gap:10px}
+.option-row input[type="text"]{flex:1;min-height:var(--tap)}
+.option-row input[type="checkbox"],.option-row input[type="radio"]{
+  width:22px;height:22px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.add-option-btn{background:none;border:1px dashed var(--border);color:var(--muted);border-radius:8px;
+  padding:10px;cursor:pointer;font-size:.82rem;font-family:'Sora',sans-serif;transition:all .15s;
+  min-height:var(--tap)}
+@media(hover:hover){.add-option-btn:hover{border-color:var(--accent);color:var(--accent)}}
+.form-actions{display:flex;gap:10px;flex-wrap:wrap}
+.form-actions .btn{flex:1;min-width:120px}
+
+/* ══ QUESTION LIST ══ */
+.q-list{display:flex;flex-direction:column;gap:8px}
+.q-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:14px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.q-item.is-flagged{border-color:rgba(255,215,64,.35)}
+.q-item-text{font-size:.86rem;flex:1;cursor:pointer;line-height:1.4;padding-top:2px}
+@media(hover:hover){.q-item-text:hover{color:var(--accent)}}
+.q-item-badge{font-size:.62rem;font-weight:700;padding:3px 7px;border-radius:20px;text-transform:uppercase;
+  letter-spacing:.4px;white-space:nowrap;background:rgba(0,229,255,.12);color:var(--accent);
+  border:1px solid rgba(0,229,255,.2);flex-shrink:0}
+.q-item-badge.multi{background:rgba(123,94,167,.2);color:#c084fc;border-color:rgba(123,94,167,.3)}
+.q-item-badge.flag-badge{background:rgba(255,215,64,.12);color:var(--yellow);border-color:rgba(255,215,64,.25)}
+.q-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.q-item-badges{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.q-item-actions{display:flex;gap:4px}
+.icon-btn{background:none;border:none;cursor:pointer;color:var(--muted);
+  padding:8px;border-radius:8px;transition:all .15s;font-size:1rem;line-height:1;
+  min-width:var(--tap);min-height:var(--tap);display:flex;align-items:center;justify-content:center}
+@media(hover:hover){
+  .icon-btn:hover{color:var(--red);background:rgba(255,82,82,.1)}
+  .icon-btn.flag-icon:hover{color:var(--yellow);background:rgba(255,215,64,.1)}
+  .icon-btn.edit-icon:hover{color:var(--accent);background:rgba(0,229,255,.08)}
+}
+.icon-btn:active{opacity:.6}
+.icon-btn.flag-icon{color:var(--muted)}
+.icon-btn.flag-icon.active{color:var(--yellow)}
+
+.manage-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.filter-chips{display:flex;gap:6px}
+.chip{font-size:.7rem;font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;
+  min-height:34px;display:flex;align-items:center}
+.chip.active{border-color:var(--yellow);color:var(--yellow);background:rgba(255,215,64,.08)}
+
+/* ══ EDIT MODAL ══ */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+  display:flex;align-items:flex-end;justify-content:center;padding:0}
+@media(min-width:600px){.modal-overlay{align-items:center;padding:16px}}
+.modal{background:var(--surface);border:1px solid var(--border);width:100%;
+  max-width:600px;max-height:92vh;overflow-y:auto;animation:slideUp .25s ease;
+  border-radius:var(--radius) var(--radius) 0 0;padding:24px 20px;
+  padding-bottom:calc(24px + var(--safe-bot))}
+@media(min-width:600px){.modal{border-radius:var(--radius);padding:28px;padding-bottom:28px;animation:fadeIn .2s ease}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;display:block}
+@media(min-width:600px){.modal-handle{display:none}}
+.modal-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:18px}
+.modal-footer{display:flex;gap:10px;margin-top:18px}
+.modal-footer .btn{flex:1}
+
+/* ══ IMPORT ══ */
+.import-area{background:var(--surface2);border:2px dashed var(--border);border-radius:10px;
+  padding:16px;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--text);
+  width:100%;height:180px;resize:vertical;outline:none;transition:border-color .18s;
+  -webkit-appearance:none}
+.import-area:focus{border-color:var(--accent)}
+.import-format{background:var(--surface2);border-radius:8px;padding:12px;
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--muted);
+  line-height:1.7;margin-bottom:12px;border:1px solid var(--border);overflow-x:auto}
+.import-format .hl{color:var(--accent)}
+.import-format .hl2{color:var(--yellow)}
+.import-actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.import-actions .btn{flex:1;min-width:100px}
+
+/* ══ TIMERS ══ */
+.timer-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.timer-box{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:.85rem;
+  font-weight:700;transition:border-color .3s}
+.timer-box .t-lbl{font-size:.58rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+  font-family:'Sora',sans-serif;font-weight:400}
+.timer-box .t-val{color:var(--accent)}
+.timer-box.warn{border-color:rgba(255,145,0,.5)}
+.timer-box.warn .t-val{color:var(--orange)}
+.timer-box.danger{border-color:rgba(255,82,82,.5)}
+.timer-box.danger .t-val{color:var(--red);animation:pulse .7s infinite alternate}
+.q-ring-wrap{display:flex;align-items:center;gap:8px}
+.q-ring{position:relative;width:44px;height:44px;flex-shrink:0}
+.q-ring svg{transform:rotate(-90deg)}
+.q-ring .r-bg{fill:none;stroke:var(--border);stroke-width:4}
+.q-ring .r-fill{fill:none;stroke:var(--accent);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .9s linear,stroke .3s}
+.q-ring .r-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:700;color:var(--accent)}
+@keyframes pulse{from{opacity:1}to{opacity:.35}}
+
+/* ══ QUIZ HEADER ══ */
+.quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.progress-bar-wrap{flex:1;min-width:120px}
+.progress-label{font-size:.68rem;color:var(--muted);margin-bottom:4px;display:flex;justify-content:space-between}
+.progress-bar{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .4s ease}
+.score-badge{font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:700;
+  padding:6px 12px;border-radius:20px;background:rgba(0,230,118,.1);color:var(--green);
+  border:1px solid rgba(0,230,118,.25);white-space:nowrap}
+
+/* ══ QUESTION CARD ══ */
+.question-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin-bottom:14px;transition:border-color .3s}
+.question-card.is-flagged{border-color:rgba(255,215,64,.45)}
+.question-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.question-num{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding-top:8px}
+.question-text{font-size:clamp(1rem,2.5vw,1.1rem);font-weight:500;line-height:1.55;margin-bottom:10px}
+.question-hint{font-size:.75rem;color:var(--yellow);margin-bottom:16px;display:flex;align-items:center;gap:5px}
+.question-hint::before{content:'⚡'}
+.choices{display:flex;flex-direction:column;gap:10px}
+.choice-btn{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;cursor:pointer;font-family:'Sora',sans-serif;
+  font-size:clamp(.88rem,2.2vw,.95rem);color:var(--text);text-align:left;
+  transition:all .15s;display:flex;align-items:flex-start;gap:12px;
+  min-height:var(--tap);width:100%;-webkit-appearance:none}
+.choice-btn .ck{font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:700;
+  padding:3px 7px;background:var(--bg);border:1px solid var(--border);border-radius:5px;
+  color:var(--muted);flex-shrink:0;margin-top:2px;transition:all .15s}
+.choice-btn:active:not(:disabled){border-color:var(--accent);transform:scale(.99)}
+@media(hover:hover){
+  .choice-btn:hover:not(:disabled){border-color:var(--accent)}
+  .choice-btn:hover:not(:disabled) .ck{border-color:var(--accent);color:var(--accent)}
+}
+.choice-btn.selected{border-color:var(--accent);background:rgba(0,229,255,.06)}
+.choice-btn.selected .ck{background:var(--accent);color:#000;border-color:var(--accent)}
+.choice-btn.correct{border-color:var(--green)!important;background:rgba(0,230,118,.08)!important}
+.choice-btn.correct .ck{background:var(--green);color:#000;border-color:var(--green)}
+.choice-btn.wrong{border-color:var(--red)!important;background:rgba(255,82,82,.08)!important}
+.choice-btn.wrong .ck{background:var(--red);color:#fff;border-color:var(--red)}
+.choice-btn:disabled{cursor:default}
+.feedback-box{border-radius:10px;padding:14px 16px;margin-top:14px;font-size:.88rem;
+  line-height:1.5;display:none;animation:fadeIn .25s ease}
+.feedback-box.show{display:block}
+.feedback-box.correct-fb{background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--green)}
+.feedback-box.wrong-fb{background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);color:var(--red)}
+.feedback-box.timeout-fb{background:rgba(255,145,0,.1);border:1px solid rgba(255,145,0,.3);color:var(--orange)}
+.feedback-box .fb-title{font-weight:700;margin-bottom:4px}
+.feedback-box .fb-explain{color:var(--text);font-size:.82rem;margin-top:6px}
+
+/* ── Quiz footer ── */
+.quiz-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  position:sticky;bottom:calc(16px + var(--safe-bot));background:var(--bg);
+  padding:12px 0 0;border-top:1px solid var(--border);margin-top:4px}
+.quiz-footer-hint{font-size:.75rem;color:var(--muted)}
+.submit-btn{flex:1;max-width:220px;padding:14px 20px;font-size:.88rem}
+@media(max-width:400px){.submit-btn{max-width:none;width:100%}}
+
+/* ══ RESULTS ══ */
+.results-card{text-align:center;padding:32px 20px}
+.result-score{font-size:clamp(3rem,10vw,4rem);font-weight:800;margin-bottom:8px}
+.result-score.pass{color:var(--green)}
+.result-score.fail{color:var(--red)}
+.result-label{font-size:.95rem;color:var(--muted);margin-bottom:20px}
+.result-stats{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;text-align:center;min-width:70px}
+.stat-val{font-size:1.3rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.stat-lbl{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+.result-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.result-actions .btn{flex:1;max-width:160px}
+.flagged-section{text-align:left;margin-top:20px}
+.flagged-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--yellow);margin-bottom:10px}
+.flagged-q{background:var(--surface2);border:1px solid rgba(255,215,64,.2);border-radius:10px;padding:14px;margin-bottom:8px}
+.flagged-q .fq-q{font-size:.86rem;margin-bottom:5px;line-height:1.4}
+.flagged-q .fq-a{font-size:.76rem;color:var(--green)}
+.flagged-q .fq-e{font-size:.73rem;color:var(--muted);margin-top:4px}
+
+/* ══ SETTINGS ══ */
+.settings-row{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid var(--border);gap:12px}
+.settings-row:last-child{border-bottom:none}
+.settings-row .s-lbl{font-size:.9rem;line-height:1.3}
+.settings-row .s-desc{font-size:.72rem;color:var(--muted);margin-top:2px}
+.settings-row input[type="number"]{width:70px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;
+  font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);
+  -webkit-appearance:none}
+.settings-row input[type="number"]:focus{border-color:var(--accent)}
+.danger-row{display:flex;gap:10px;flex-wrap:wrap}
+.danger-row .btn{flex:1;min-width:140px}
+.toggle{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;inset:0;background:var(--surface2);border:1px solid var(--border);border-radius:26px;transition:.2s}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.2s}
+.toggle input:checked+.toggle-slider{background:rgba(0,229,255,.15);border-color:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(20px);background:var(--accent)}
+
+/* ══ MISC ══ */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.anim{animation:fadeIn .25s ease}
+.empty-state{text-align:center;padding:36px 20px;color:var(--muted);font-size:.88rem}
+.empty-state .icon{font-size:2.2rem;margin-bottom:10px}
+.notice{font-size:.76rem;color:var(--muted);background:var(--surface2);border-radius:8px;
+  padding:10px 14px;border:1px solid var(--border);margin-top:8px;line-height:1.5}
+
+/* ══ INSTALL BANNER ══ */
+#installBanner{display:none;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;
+  align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#installBanner.show{display:flex}
+#installBanner p{font-size:.82rem;color:var(--text);flex:1}
+#installBanner p strong{color:var(--accent)}
+
+/* ══ OFFLINE BADGE ══ */
+#offlineBadge{display:none;position:fixed;bottom:calc(16px + var(--safe-bot));left:50%;
+  transform:translateX(-50%);background:var(--surface);border:1px solid var(--orange);
+  border-radius:20px;padding:6px 14px;font-size:.72rem;color:var(--orange);
+  font-weight:600;z-index:200;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- OFFLINE BADGE -->
+  <div id="offlineBadge">⚠ Offline</div>
+
+  <!-- INSTALL BANNER -->
+  <div id="installBanner">
+    <p>📱 <strong>Add to Home Screen</strong> for the full app experience — works offline too.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="triggerInstall()">Install</button>
+      <button class="btn btn-ghost btn-sm" onclick="dismissInstall()">✕</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
+    <div class="header-actions" id="headerRight"></div>
+  </header>
+
+  <!-- ═══ SETS HOME ═══ -->
+  <div id="view-home" class="view active">
+    <div class="sets-header">
+      <div class="sets-header-text">
+        <h2>Your Question Sets</h2>
+        <p>Each set has its own questions and flags.</p>
+      </div>
+      <div class="sets-header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export All</button>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆ Import
+          <input type="file" accept=".qforge,.json" style="display:none" onchange="importBank(event)">
+        </label>
+      </div>
+    </div>
+    <div id="homeMsg" class="notice" style="display:none;margin-bottom:12px"></div>
+    <div class="sets-grid" id="setsGrid"></div>
+  </div>
+
+  <!-- ═══ INNER APP ═══ -->
+  <div id="innerApp" style="display:none">
+    <div class="breadcrumb" style="margin-bottom:14px">
+      <span style="cursor:pointer" onclick="goHome()">Sets</span>
+      <span class="sep">›</span>
+      <span class="set-name" id="bcSetName"></span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showView('manage')">📋 Questions</button>
+      <button class="tab" onclick="showView('add')">➕ Add</button>
+      <button class="tab" onclick="showView('import')">📥 Import</button>
+      <button class="tab" onclick="showView('settings')">⚙️</button>
+    </div>
+
+    <!-- MANAGE -->
+    <div id="view-manage" class="view active">
+      <div class="card">
+        <div class="manage-top">
+          <div class="card-title" style="margin:0">Questions (<span id="qCount">0</span>)</div>
+          <div class="filter-chips">
+            <button class="chip active" id="chipAll" onclick="setFilter('all')">All</button>
+            <button class="chip" id="chipFlagged" onclick="setFilter('flagged')">🚩 (<span id="flagCount">0</span>)</button>
+          </div>
+        </div>
+        <div id="qList" class="q-list"></div>
+      </div>
+    </div>
+
+    <!-- ADD -->
+    <div id="view-add" class="view">
+      <div class="card">
+        <div class="card-title">Add New Question</div>
+        <div class="q-form">
+          <div><label>Question Text</label><textarea id="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
+          <div>
+            <label>Answer Type</label>
+            <select id="newQType" onchange="updateOptionControls()">
+              <option value="single">Single answer (pick 1)</option>
+              <option value="multi">Multiple answers (pick 2+)</option>
+            </select>
+          </div>
+          <div>
+            <label>Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></label>
+            <div class="options-builder" id="optionsBuilder"></div>
+            <button class="add-option-btn" onclick="addOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+          </div>
+          <div><label>Explanation (optional)</label><input type="text" id="newQExplain" placeholder="Shown after answering..."></div>
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="saveQuestion()">Save Question</button>
+            <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORT -->
+    <div id="view-import" class="view">
+      <div class="card">
+        <div class="card-title">Import into "<span id="importSetName"></span>"</div>
+        <div class="import-format">
+<span class="hl">Q:</span> Question text<br>
+<span class="hl2">A:</span> Option &nbsp;<span class="hl2">*B:</span> Correct &nbsp;<span class="hl2">C:</span> Option<br>
+<span class="hl">EXPLAIN:</span> Explanation text<br>
+<span style="color:var(--border)">───</span><br>
+<span style="font-size:.65rem;color:var(--muted)">Also: Q1: Q42: [MULTI] (Select two) [SIMULATION]</span>
+        </div>
+        <textarea class="import-area" id="importText" placeholder="Paste questions here..."></textarea>
+        <div class="import-actions">
+          <button class="btn btn-primary" onclick="importQuestions()">Import</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('importText').value=''">Clear</button>
+        </div>
+        <div id="importMsg" class="notice" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="view-settings" class="view">
+      <div class="card">
+        <div class="card-title">Quiz Behaviour</div>
+        <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div><div class="s-desc">Randomize order each quiz</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
+        <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div><div class="s-desc">Randomize option order</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
+        <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
+        <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
+        <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Timers</div>
+        <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600"></div>
+        <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
+      </div>
+      <div class="card">
+        <div class="card-title">This Set</div>
+        <div class="settings-row">
+          <div><div class="s-lbl">Rename</div></div>
+          <div style="display:flex;gap:8px;align-items:center;flex:1;max-width:280px">
+            <input type="text" id="renameInput" style="flex:1;min-height:var(--tap);background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.88rem;padding:8px 12px;outline:none" placeholder="Set name...">
+            <button class="btn btn-ghost btn-sm" onclick="renameCurrentSet()">Save</button>
+          </div>
+        </div>
+        <div class="settings-row"><div><div class="s-lbl">Export This Set</div></div><button class="btn btn-ghost btn-sm" onclick="exportCurrentSet()">⬇ Export</button></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Danger Zone</div>
+        <div class="danger-row">
+          <button class="btn btn-danger btn-sm" onclick="clearAllQuestions()">🗑 Clear Questions</button>
+          <button class="btn btn-sm" style="color:var(--yellow);border:1px solid rgba(255,215,64,.4);background:transparent" onclick="clearAllFlags()">🚩 Clear Flags</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCurrentSet()">✕ Delete Set</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ -->
+    <div id="view-quiz" class="view">
+      <div class="quiz-header">
+        <button class="btn btn-ghost btn-sm" onclick="endQuiz()">← Exit</button>
+        <div class="progress-bar-wrap">
+          <div class="progress-label"><span id="progressLabel">Q 1 of 10</span><span id="progressPct">0%</span></div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+        <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
+      </div>
+      <div class="timer-row">
+        <div class="timer-box" id="overallBox"><span class="t-lbl">Total</span><span class="t-val" id="overallVal">00:00</span></div>
+        <div class="q-ring-wrap" id="qTimerWrap" style="display:none">
+          <div class="q-ring">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <circle class="r-bg" cx="22" cy="22" r="18"/>
+              <circle class="r-fill" id="ringFill" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="0"/>
+            </svg>
+            <div class="r-txt" id="ringTxt">60</div>
+          </div>
+          <div class="timer-box" id="qTimerBox"><span class="t-lbl">Question</span><span class="t-val" id="qTimerVal">1:00</span></div>
+        </div>
+      </div>
+      <div class="question-card anim" id="questionCard">
+        <div class="question-top">
+          <div class="question-num" id="questionNum">Question 1</div>
+          <button class="btn btn-flag" id="flagBtn" onclick="toggleFlag()">🚩 Flag</button>
+        </div>
+        <div class="question-text" id="questionText"></div>
+        <div class="question-hint" id="questionHint" style="display:none"></div>
+        <div class="choices" id="choicesList"></div>
+        <div class="feedback-box" id="feedbackBox">
+          <div class="fb-title" id="fbTitle"></div>
+          <div class="fb-explain" id="fbExplain"></div>
+        </div>
+      </div>
+      <div class="quiz-footer">
+        <span class="quiz-footer-hint" id="selHint"></span>
+        <button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="view-results" class="view">
+      <div class="card results-card">
+        <div class="result-score" id="resultScore"></div>
+        <div class="result-label" id="resultLabel"></div>
+        <div class="result-stats">
+          <div class="stat-box"><div class="stat-val" id="rCorrect" style="color:var(--green)">0</div><div class="stat-lbl">Correct</div></div>
+          <div class="stat-box"><div class="stat-val" id="rWrong" style="color:var(--red)">0</div><div class="stat-lbl">Wrong</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTimeout" style="color:var(--orange)">0</div><div class="stat-lbl">Timeout</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTotal">0</div><div class="stat-lbl">Total</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTime" style="color:var(--accent)">—</div><div class="stat-lbl">Time</div></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
+          <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
+          <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
+        </div>
+        <div id="flaggedSection" style="display:none" class="flagged-section">
+          <div class="flagged-section-title">🚩 Flagged for Review</div>
+          <div id="flaggedList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /innerApp -->
+</div><!-- /app -->
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal" style="display:none" onclick="closeEditModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <span class="modal-handle"></span>
+    <div class="modal-title">Edit Question</div>
+    <div class="q-form">
+      <div><label>Question Text</label><textarea id="editQText" rows="3"></textarea></div>
+      <div>
+        <label>Answer Type</label>
+        <select id="editQType" onchange="updateEditOptionControls()">
+          <option value="single">Single answer</option>
+          <option value="multi">Multiple answers</option>
+        </select>
+      </div>
+      <div>
+        <label>Answer Choices</label>
+        <div class="options-builder" id="editOptionsBuilder"></div>
+        <button class="add-option-btn" onclick="addEditOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+      </div>
+      <div><label>Explanation (optional)</label><input type="text" id="editQExplain"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditQuestion()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  PWA — Service Worker + Install prompt
+// ═══════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+}
+let _deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); _deferredInstall=e;
+  if(!localStorage.getItem('qforge_install_dismissed'))
+    document.getElementById('installBanner').classList.add('show');
+});
+window.addEventListener('appinstalled',()=>{
+  document.getElementById('installBanner').classList.remove('show');
+  _deferredInstall=null;
+});
+function triggerInstall(){
+  if(!_deferredInstall) return;
+  _deferredInstall.prompt();
+  _deferredInstall.userChoice.then(()=>{ _deferredInstall=null; document.getElementById('installBanner').classList.remove('show'); });
+}
+function dismissInstall(){
+  localStorage.setItem('qforge_install_dismissed','1');
+  document.getElementById('installBanner').classList.remove('show');
+}
+
+// Offline indicator
+function updateOnlineStatus(){
+  document.getElementById('offlineBadge').style.display=navigator.onLine?'none':'block';
+}
+window.addEventListener('online',updateOnlineStatus);
+window.addEventListener('offline',updateOnlineStatus);
+updateOnlineStatus();
+
+// ═══════════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════════
+function loadSets(){ return JSON.parse(localStorage.getItem('qforge_sets')||'[]'); }
+function saveSets(s){ localStorage.setItem('qforge_sets',JSON.stringify(s)); }
+function loadQs(id){ return JSON.parse(localStorage.getItem('qforge_qs_'+id)||'[]'); }
+function saveQs(id,qs){ localStorage.setItem('qforge_qs_'+id,JSON.stringify(qs)); }
+function loadFlags(id){ return JSON.parse(localStorage.getItem('qforge_flags_'+id)||'[]'); }
+function saveFlags(id,fl){ localStorage.setItem('qforge_flags_'+id,JSON.stringify(fl)); }
+
+function migrateLegacy(){
+  const old=localStorage.getItem('qforge_qs'); if(!old) return;
+  if(loadSets().length) return;
+  const id=uid();
+  saveSets([{id,name:'Default Set',created:Date.now()}]);
+  saveQs(id,JSON.parse(old||'[]'));
+  saveFlags(id,JSON.parse(localStorage.getItem('qforge_flags')||'[]'));
+  localStorage.removeItem('qforge_qs'); localStorage.removeItem('qforge_flags');
+}
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+let activeSetId=null, questions=[], flaggedKeys=[];
+let quiz={questions:[],idx:0,score:0,selected:[],timeouts:0};
+let answered=false, qFilter='all', editingIdx=null;
+let overallInterval=null, qInterval=null;
+let overallSec=0, qSec=0, qMaxSec=60;
+
+// ═══════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function esc(s=''){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function save(){ if(activeSetId) saveQs(activeSetId,questions); }
+function saveFlg(){ if(activeSetId) saveFlags(activeSetId,flaggedKeys); }
+function showHomeMsg(msg,ok){ const el=document.getElementById('homeMsg'); el.style.display='block'; el.style.color=ok?'var(--green)':'var(--red)'; el.textContent=msg; }
+
+// ═══════════════════════════════════════════════════
+//  VIEWS
+// ═══════════════════════════════════════════════════
+const INNER_VIEWS=['manage','add','import','settings','quiz','results'];
+const TAB_VIEWS=['manage','add','import','settings'];
+
+function showView(name){
+  INNER_VIEWS.forEach(v=>{ const el=document.getElementById('view-'+v); if(el) el.classList.toggle('active',v===name); });
+  document.querySelectorAll('#innerApp .tab').forEach((t,i)=>t.classList.toggle('active',TAB_VIEWS[i]===name));
+  if(name==='manage') renderQList();
+  if(name!=='quiz'){ clearInterval(overallInterval); clearInterval(qInterval); }
+  // Scroll to top on view change
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ═══════════════════════════════════════════════════
+//  HOME / SETS
+// ═══════════════════════════════════════════════════
+function goHome(){
+  if(document.getElementById('view-quiz').classList.contains('active')){
+    if(!confirm('Exit quiz? Progress will be lost.')) return;
+    clearInterval(overallInterval); clearInterval(qInterval);
+  }
+  activeSetId=null; questions=[]; flaggedKeys=[];
+  document.getElementById('innerApp').style.display='none';
+  document.getElementById('view-home').classList.add('active');
+  renderHeader(); renderSetsGrid();
+}
+
+function renderHeader(){
+  const hr=document.getElementById('headerRight');
+  if(activeSetId){
+    hr.innerHTML=`<button class="btn btn-primary btn-sm" onclick="startQuiz()">▶ Quiz</button>`;
+  } else { hr.innerHTML=''; }
+}
+
+function renderSetsGrid(){
+  const sets=loadSets();
+  const grid=document.getElementById('setsGrid');
+  let html=sets.map(s=>{
+    const qs=loadQs(s.id), fl=loadFlags(s.id), isActive=s.id===activeSetId;
+    return `<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
+      <div class="set-card-actions">
+        <button class="icon-btn" style="font-size:.85rem;min-width:36px;min-height:36px" onclick="event.stopPropagation();startRenameCard('${s.id}')" title="Rename">✏️</button>
+        <button class="icon-btn" style="min-width:36px;min-height:36px" onclick="event.stopPropagation();deleteSet('${s.id}')" title="Delete">🗑</button>
+      </div>
+      <div class="set-card-name" id="sname-${s.id}">${esc(s.name)}</div>
+      <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''} · ${fl.length} flagged</div>
+      ${isActive?'<span class="set-card-badge">Active</span>':''}
+    </div>`;
+  }).join('');
+  html+=`<div class="new-set-card" onclick="createSet()"><div class="plus">＋</div><div>New Set</div></div>`;
+  grid.innerHTML=html;
+}
+
+function openSet(id){
+  const sets=loadSets(), set=sets.find(s=>s.id===id); if(!set) return;
+  activeSetId=id; questions=loadQs(id); flaggedKeys=loadFlags(id);
+  document.getElementById('view-home').classList.remove('active');
+  document.getElementById('innerApp').style.display='block';
+  document.getElementById('bcSetName').textContent=set.name;
+  document.getElementById('importSetName').textContent=set.name;
+  document.getElementById('renameInput').value=set.name;
+  renderHeader();
+  INNER_VIEWS.forEach(v=>{ const el=document.getElementById('view-'+v); if(el) el.classList.remove('active'); });
+  document.getElementById('view-manage').classList.add('active');
+  document.querySelectorAll('#innerApp .tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+  renderQList(); initOptionRows();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+
+function createSet(){
+  const name=prompt('Set name:','New Set');
+  if(!name||!name.trim()) return;
+  const sets=loadSets(), id=uid();
+  sets.push({id,name:name.trim(),created:Date.now()});
+  saveSets(sets); renderSetsGrid(); openSet(id);
+}
+
+function deleteSet(id){
+  const sets=loadSets(), set=sets.find(s=>s.id===id);
+  if(!set||!confirm(`Delete "${set.name}" and all questions?`)) return;
+  sets.splice(sets.findIndex(s=>s.id===id),1);
+  saveSets(sets); localStorage.removeItem('qforge_qs_'+id); localStorage.removeItem('qforge_flags_'+id);
+  if(activeSetId===id) goHome(); else renderSetsGrid();
+}
+function deleteCurrentSet(){ if(activeSetId) deleteSet(activeSetId); }
+
+function startRenameCard(id){
+  const nameEl=document.getElementById('sname-'+id);
+  const orig=nameEl.textContent;
+  nameEl.innerHTML=`<input class="set-name-input" value="${esc(orig)}" onblur="finishRenameCard('${id}',this)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${esc(orig)}';this.blur()}">`;
+  nameEl.querySelector('input').focus();
+}
+function finishRenameCard(id,inp){
+  const val=inp.value.trim()||'Untitled Set';
+  const sets=loadSets(), s=sets.find(x=>x.id===id);
+  if(s){ s.name=val; saveSets(sets); }
+  renderSetsGrid();
+}
+function renameCurrentSet(){
+  const val=document.getElementById('renameInput').value.trim();
+  if(!val||!activeSetId) return;
+  const sets=loadSets(), s=sets.find(x=>x.id===activeSetId);
+  if(s){ s.name=val; saveSets(sets); }
+  document.getElementById('bcSetName').textContent=val;
+  document.getElementById('importSetName').textContent=val;
+  renderSetsGrid();
+}
+
+// ═══════════════════════════════════════════════════
+//  FLAGS
+// ═══════════════════════════════════════════════════
+function flagKey(q){ return q.text.trim(); }
+function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
+function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
+function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); renderQList(); }
+
+function setFilter(f){
+  qFilter=f;
+  document.getElementById('chipAll').classList.toggle('active',f==='all');
+  document.getElementById('chipFlagged').classList.toggle('active',f==='flagged');
+  renderQList();
+}
+
+// ═══════════════════════════════════════════════════
+//  QUESTION LIST
+// ═══════════════════════════════════════════════════
+function renderQList(){
+  const fc=questions.filter(isFlagged).length;
+  document.getElementById('qCount').textContent=questions.length;
+  document.getElementById('flagCount').textContent=fc;
+  const list=document.getElementById('qList');
+  const shown=qFilter==='flagged'
+    ? questions.map((q,i)=>({q,i})).filter(({q})=>isFlagged(q))
+    : questions.map((q,i)=>({q,i}));
+  if(!shown.length){
+    list.innerHTML=`<div class="empty-state"><div class="icon">${qFilter==='flagged'?'🚩':'📭'}</div>${qFilter==='flagged'?'No flagged questions.':'No questions yet.'}</div>`;
+    return;
+  }
+  list.innerHTML=shown.map(({q,i})=>{
+    const fl=isFlagged(q);
+    return `<div class="q-item${fl?' is-flagged':''}">
+      <div class="q-item-text" onclick="openEditModal(${i})">${esc(q.text.slice(0,80))}${q.text.length>80?'…':''}</div>
+      <div class="q-item-right">
+        <div class="q-item-badges">
+          ${fl?'<span class="q-item-badge flag-badge">🚩</span>':''}
+          <span class="q-item-badge${q.type==='multi'?' multi':''}">${q.type==='multi'?'Multi':'Single'}</span>
+        </div>
+        <div class="q-item-actions">
+          <button class="icon-btn edit-icon" onclick="openEditModal(${i})" title="Edit">✏️</button>
+          <button class="icon-btn flag-icon${fl?' active':''}" onclick="listToggleFlag(${i})" title="Flag">🚩</button>
+          <button class="icon-btn" onclick="deleteQ(${i})" title="Delete">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function listToggleFlag(i){ toggleGlobalFlag(questions[i]); renderQList(); }
+function deleteQ(i){ if(confirm('Delete this question?')){ questions.splice(i,1); save(); renderQList(); } }
+function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ questions=[]; save(); renderQList(); } }
+
+// ═══════════════════════════════════════════════════
+//  ADD FORM
+// ═══════════════════════════════════════════════════
+function initOptionRows(){ document.getElementById('optionsBuilder').innerHTML=''; [1,2,3,4].forEach(()=>addOptionRow()); }
+function updateOptionControls(){
+  const t=document.getElementById('newQType').value==='multi'?'checkbox':'radio';
+  document.querySelectorAll('#optionsBuilder .opt-correct-input').forEach(inp=>{inp.type=t;inp.name='correct';});
+}
+function addOptionRow(){
+  const b=document.getElementById('optionsBuilder');
+  const t=document.getElementById('newQType').value==='multi'?'checkbox':'radio';
+  const d=document.createElement('div'); d.className='option-row';
+  d.innerHTML=`<input type="${t}" class="opt-correct-input" name="correct"><input type="text" class="opt-text" placeholder="Answer option..."><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  b.appendChild(d);
+}
+function cancelEdit(){ initOptionRows(); document.getElementById('newQText').value=''; document.getElementById('newQExplain').value=''; document.getElementById('newQType').value='single'; showView('manage'); }
+function saveQuestion(){
+  const text=document.getElementById('newQText').value.trim();
+  if(!text) return alert('Please enter a question.');
+  const rows=document.querySelectorAll('#optionsBuilder .option-row');
+  const options=[],correct=[];
+  rows.forEach(row=>{ const t=row.querySelector('.opt-text').value.trim(); const c=row.querySelector('.opt-correct-input').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
+  if(options.length<2) return alert('Add at least 2 options.');
+  if(!correct.length) return alert('Mark at least one correct answer.');
+  questions.push({text,type:document.getElementById('newQType').value,options,correct,explain:document.getElementById('newQExplain').value.trim()});
+  save(); cancelEdit();
+}
+
+// ═══════════════════════════════════════════════════
+//  EDIT MODAL
+// ═══════════════════════════════════════════════════
+function openEditModal(i){
+  editingIdx=i; const q=questions[i];
+  document.getElementById('editQText').value=q.text;
+  document.getElementById('editQType').value=q.type;
+  document.getElementById('editQExplain').value=q.explain||'';
+  const b=document.getElementById('editOptionsBuilder'); b.innerHTML='';
+  q.options.forEach((opt,oi)=>{
+    const d=document.createElement('div'); d.className='option-row';
+    const isC=q.correct.includes(oi), t=q.type==='multi'?'checkbox':'radio';
+    d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"${isC?' checked':''}><input type="text" class="edit-opt-text" value="${esc(opt)}"><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+    b.appendChild(d);
+  });
+  document.getElementById('editModal').style.display='flex';
+}
+function closeEditModal(e){
+  if(e&&e.target!==document.getElementById('editModal')) return;
+  document.getElementById('editModal').style.display='none'; editingIdx=null;
+}
+function updateEditOptionControls(){
+  const t=document.getElementById('editQType').value==='multi'?'checkbox':'radio';
+  document.querySelectorAll('#editOptionsBuilder .edit-opt-correct').forEach(inp=>{inp.type=t;inp.name='editcorrect';});
+}
+function addEditOptionRow(){
+  const b=document.getElementById('editOptionsBuilder');
+  const t=document.getElementById('editQType').value==='multi'?'checkbox':'radio';
+  const d=document.createElement('div'); d.className='option-row';
+  d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"><input type="text" class="edit-opt-text" placeholder="Answer option..."><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  b.appendChild(d);
+}
+function saveEditQuestion(){
+  if(editingIdx===null) return;
+  const text=document.getElementById('editQText').value.trim(); if(!text) return alert('Question text required.');
+  const rows=document.querySelectorAll('#editOptionsBuilder .option-row');
+  const options=[],correct=[];
+  rows.forEach(row=>{ const t=row.querySelector('.edit-opt-text').value.trim(); const c=row.querySelector('.edit-opt-correct').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
+  if(options.length<2) return alert('Need at least 2 options.');
+  if(!correct.length) return alert('Mark at least one correct answer.');
+  const oldKey=flagKey(questions[editingIdx]);
+  questions[editingIdx]={text,type:document.getElementById('editQType').value,options,correct,explain:document.getElementById('editQExplain').value.trim()};
+  const newKey=flagKey(questions[editingIdx]);
+  if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
+  save(); document.getElementById('editModal').style.display='none'; editingIdx=null; renderQList();
+}
+
+// ═══════════════════════════════════════════════════
+//  IMPORT
+// ═══════════════════════════════════════════════════
+function importQuestions(){
+  const raw=document.getElementById('importText').value.trim();
+  let added=0,errors=0;
+  raw.split(/\n\s*\n/).filter(b=>b.trim()).forEach(block=>{
+    try{
+      const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+      const qLine=lines.find(l=>/^Q\d*:/i.test(l)); if(!qLine) return;
+      let text=qLine.replace(/^Q\d*:\s*/i,'').replace(/\[SIMULATION\]/gi,'').trim();
+      let isMulti=/\[MULTI\]/i.test(text)||/\(select\s+\w+\)/i.test(text);
+      text=text.replace(/\[MULTI\]/gi,'').replace(/\(select\s+\w+\)/gi,'').trim();
+      const expLine=lines.find(l=>/^EXPLAIN:/i.test(l));
+      const explain=expLine?expLine.replace(/^EXPLAIN:\s*/i,'').trim():'';
+      const rawOptLines=[];
+      lines.forEach(l=>{
+        if(/^Q\d*:/i.test(l)||/^EXPLAIN:/i.test(l)) return;
+        const chunks=l.split(/\s{2,}/), optChunks=chunks.filter(c=>/^\*?[A-Z]:\s*.+/i.test(c));
+        if(optChunks.length>=2) optChunks.forEach(c=>rawOptLines.push(c.trim()));
+        else if(/^\*?[A-Z]:\s*.+/i.test(l)) rawOptLines.push(l);
+      });
+      const opts=[],corr=[];
+      rawOptLines.forEach(ol=>{
+        const isC=ol.trimStart().startsWith('*');
+        const cleaned=ol.replace(/^\*?[A-Z]:\s*/i,'').replace(/←.*$/,'').replace(/\(correct\)/gi,'').trim();
+        if(cleaned){ opts.push(cleaned); if(isC) corr.push(opts.length-1); }
+      });
+      if(corr.length>1) isMulti=true;
+      if(opts.length>=2&&corr.length){ questions.push({text,type:isMulti?'multi':'single',options:opts,correct:corr,explain}); added++; }
+      else errors++;
+    }catch(e){ errors++; }
+  });
+  save();
+  const m=document.getElementById('importMsg'); m.style.display='block';
+  m.style.color=added?'var(--green)':'var(--red)';
+  m.textContent=`✓ Imported ${added} question(s).${errors?' '+errors+' skipped.':''}`;
+  if(added){ document.getElementById('importText').value=''; renderQList(); }
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORT / IMPORT BANK
+// ═══════════════════════════════════════════════════
+function exportCurrentSet(){
+  if(!activeSetId||!questions.length) return alert('No questions to export.');
+  const sets=loadSets(), s=sets.find(x=>x.id===activeSetId);
+  const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions,flaggedKeys};
+  dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.qforge`);
+}
+function exportAll(){
+  const sets=loadSets(); if(!sets.length) return showHomeMsg('No sets to export.',false);
+  const payload={version:2,exported:new Date().toISOString(),sets:sets.map(s=>({id:s.id,name:s.name,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)}))};
+  dlBlob(JSON.stringify(payload,null,2),`quizforge-all-${new Date().toISOString().slice(0,10)}.qforge`);
+  showHomeMsg(`✓ Exported ${sets.length} set(s).`,true);
+}
+function importBank(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result); let setsAdded=0,qAdded=0;
+      if(data.sets&&Array.isArray(data.sets)){
+        const existing=loadSets();
+        data.sets.forEach(sd=>{ const newId=uid(); existing.push({id:newId,name:sd.name||'Imported Set',created:sd.created||Date.now()}); saveQs(newId,Array.isArray(sd.questions)?sd.questions:[]); saveFlags(newId,Array.isArray(sd.flaggedKeys)?sd.flaggedKeys:[]); setsAdded++; qAdded+=(sd.questions||[]).length; });
+        saveSets(existing); showHomeMsg(`✓ Imported ${setsAdded} set(s) with ${qAdded} question(s).`,true);
+      } else if(data.questions&&Array.isArray(data.questions)){
+        const existing=loadSets(), newId=uid(), name=(data.setName||file.name.replace(/\.qforge$/,'')||'Imported Set').trim();
+        existing.push({id:newId,name,created:Date.now()}); saveQs(newId,data.questions); saveFlags(newId,Array.isArray(data.flaggedKeys)?data.flaggedKeys:[]); saveSets(existing);
+        showHomeMsg(`✓ Created "${name}" with ${data.questions.length} question(s).`,true);
+      } else throw new Error();
+      renderSetsGrid();
+    }catch(){ showHomeMsg('✗ Invalid file.',false); }
+    evt.target.value='';
+  };
+  reader.readAsText(file);
+}
+function dlBlob(content,filename){
+  const blob=new Blob([content],{type:'application/json'}), url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════
+//  QUIZ
+// ═══════════════════════════════════════════════════
+function startQuiz(){
+  let pool=[...questions];
+  if(document.getElementById('settFlaggedOnly').checked) pool=pool.filter(isFlagged);
+  if(!pool.length) return alert('No questions to quiz!');
+  if(document.getElementById('settShuffle').checked) pool.sort(()=>Math.random()-.5);
+  if(document.getElementById('settShuffleOpts').checked){
+    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+  }
+  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0};
+  answered=false; overallSec=0; clearInterval(overallInterval);
+  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
+  showView('quiz'); renderQuestion();
+}
+function updateOverallTimer(){
+  const m=Math.floor(overallSec/60).toString().padStart(2,'0'), s=(overallSec%60).toString().padStart(2,'0');
+  document.getElementById('overallVal').textContent=`${m}:${s}`;
+}
+function startQTimer(){
+  clearInterval(qInterval); qMaxSec=parseInt(document.getElementById('settQTimer').value)||0;
+  const wrap=document.getElementById('qTimerWrap');
+  if(!qMaxSec){wrap.style.display='none';return;}
+  wrap.style.display='flex'; qSec=qMaxSec; updateQTimer();
+  qInterval=setInterval(()=>{ qSec--; updateQTimer(); if(qSec<=0){clearInterval(qInterval);onTimeout();} },1000);
+}
+function updateQTimer(){
+  const m=Math.floor(qSec/60), s=(qSec%60).toString().padStart(2,'0');
+  document.getElementById('qTimerVal').textContent=`${m}:${s}`;
+  document.getElementById('ringTxt').textContent=qSec<=99?qSec:'∞';
+  const circ=113.1, pct=Math.max(0,qSec/qMaxSec);
+  document.getElementById('ringFill').style.strokeDashoffset=circ*(1-pct);
+  const box=document.getElementById('qTimerBox'), ring=document.getElementById('ringFill'), rtxt=document.getElementById('ringTxt');
+  if(pct>.5){box.className='timer-box';ring.style.stroke='var(--accent)';rtxt.style.color='var(--accent)';}
+  else if(pct>.25){box.className='timer-box warn';ring.style.stroke='var(--orange)';rtxt.style.color='var(--orange)';}
+  else{box.className='timer-box danger';ring.style.stroke='var(--red)';rtxt.style.color='var(--red)';}
+}
+function onTimeout(){
+  if(answered) return; answered=true; quiz.timeouts++;
+  const q=quiz.questions[quiz.idx];
+  document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
+  const fb=document.getElementById('feedbackBox'); fb.style.display='block'; fb.className='feedback-box show timeout-fb';
+  document.getElementById('fbTitle').textContent="⏱ Time's up!";
+  document.getElementById('fbExplain').textContent=`Correct: ${q.correct.map(i=>q.options[i]).join(', ')}${q.explain?' — '+q.explain:''}`;
+  const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
+  sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
+  if(document.getElementById('settAutoAdvance').checked) setTimeout(nextQuestion,2000);
+}
+function renderQuestion(){
+  answered=false; quiz.selected=[];
+  const q=quiz.questions[quiz.idx], total=quiz.questions.length, pct=Math.round((quiz.idx/total)*100);
+  document.getElementById('progressLabel').textContent=`Q ${quiz.idx+1} of ${total}`;
+  document.getElementById('progressPct').textContent=pct+'%';
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('scoreDisplay').textContent=quiz.score;
+  document.getElementById('questionNum').textContent=`Question ${quiz.idx+1}`;
+  document.getElementById('questionText').textContent=q.text;
+  const fl=isFlagged(q), fb=document.getElementById('flagBtn');
+  fb.textContent=fl?'🚩 Flagged':'🚩 Flag'; fb.className='btn btn-flag'+(fl?' flagged':'');
+  document.getElementById('questionCard').classList.toggle('is-flagged',fl);
+  const hint=document.getElementById('questionHint');
+  if(q.type==='multi'){hint.textContent=`Select ${q.correct.length} correct answer(s)`;hint.style.display='flex';}
+  else hint.style.display='none';
+  document.getElementById('selHint').textContent=q.type==='multi'?`Choose ${q.correct.length}`:'Choose 1';
+  const feedEl=document.getElementById('feedbackBox'); feedEl.className='feedback-box'; feedEl.style.display='none';
+  const keys='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  document.getElementById('choicesList').innerHTML=q.options.map((opt,i)=>
+    `<button class="choice-btn" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
+  ).join('');
+  const sb=document.getElementById('submitBtn'); sb.textContent='Submit Answer'; sb.disabled=false; sb.onclick=submitAnswer;
+  startQTimer();
+}
+function toggleFlag(){
+  const q=quiz.questions[quiz.idx]; toggleGlobalFlag(q);
+  const fl=isFlagged(q), btn=document.getElementById('flagBtn');
+  btn.textContent=fl?'🚩 Flagged':'🚩 Flag'; btn.className='btn btn-flag'+(fl?' flagged':'');
+  document.getElementById('questionCard').classList.toggle('is-flagged',fl);
+}
+function toggleChoice(i){
+  if(answered) return;
+  const q=quiz.questions[quiz.idx], btn=document.getElementById('choice-'+i);
+  if(q.type==='single'){ quiz.selected=[i]; document.querySelectorAll('.choice-btn').forEach((b,j)=>b.classList.toggle('selected',j===i)); }
+  else{ const p=quiz.selected.indexOf(i); if(p>=0){quiz.selected.splice(p,1);btn.classList.remove('selected');}else{quiz.selected.push(i);btn.classList.add('selected');} }
+}
+function submitAnswer(){
+  if(!quiz.selected.length) return;
+  if(answered){nextQuestion();return;}
+  clearInterval(qInterval); answered=true;
+  const q=quiz.questions[quiz.idx];
+  const isCorrect=[...q.correct].sort().join(',')===[...quiz.selected].sort().join(',');
+  if(isCorrect) quiz.score++;
+  if(document.getElementById('settFeedback').checked){
+    document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
+    const fb=document.getElementById('feedbackBox'); fb.style.display='block';
+    if(isCorrect){fb.className='feedback-box show correct-fb';document.getElementById('fbTitle').textContent='✓ Correct!';}
+    else{fb.className='feedback-box show wrong-fb';document.getElementById('fbTitle').textContent=`✗ Incorrect — Correct: ${q.correct.map(i=>q.options[i]).join(', ')}`;}
+    document.getElementById('fbExplain').textContent=(document.getElementById('settExplain').checked&&q.explain)?q.explain:'';
+  }
+  document.getElementById('scoreDisplay').textContent=quiz.score;
+  const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
+  sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
+}
+function nextQuestion(){ quiz.idx++; if(quiz.idx>=quiz.questions.length){showResults();return;} renderQuestion(); }
+function showResults(){
+  clearInterval(overallInterval); clearInterval(qInterval);
+  const total=quiz.questions.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
+  document.getElementById('resultScore').textContent=pct+'%';
+  document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
+  document.getElementById('resultLabel').textContent=pass?'🎉 Great work! You passed.':'📚 Keep studying — you\'ll get there.';
+  document.getElementById('rCorrect').textContent=quiz.score;
+  document.getElementById('rWrong').textContent=total-quiz.score-quiz.timeouts;
+  document.getElementById('rTimeout').textContent=quiz.timeouts;
+  document.getElementById('rTotal').textContent=total;
+  const m=Math.floor(overallSec/60), s=overallSec%60;
+  document.getElementById('rTime').textContent=`${m}m ${s}s`;
+  const flagged=quiz.questions.filter(isFlagged);
+  const sec=document.getElementById('flaggedSection');
+  if(flagged.length){
+    sec.style.display='block';
+    document.getElementById('flaggedList').innerHTML=flagged.map(q=>`<div class="flagged-q"><div class="fq-q">${esc(q.text)}</div><div class="fq-a">✓ ${q.correct.map(i=>esc(q.options[i])).join(', ')}</div>${q.explain?`<div class="fq-e">${esc(q.explain)}</div>`:''}</div>`).join('');
+  } else sec.style.display='none';
+  showView('results');
+}
+function endQuiz(){
+  if(!confirm('Exit quiz? Progress will be lost.')) return;
+  clearInterval(overallInterval); clearInterval(qInterval); showView('manage');
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+migrateLegacy();
+if(!loadSets().length) saveSets([{id:uid(),name:'Default Set',created:Date.now()}]);
+renderSetsGrid(); renderHeader(); initOptionRows();
+</script>
+</body>
+</html>
