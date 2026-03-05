@@ -457,6 +457,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         <div class="card-title">Quiz Behaviour</div>
         <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div><div class="s-desc">Randomize order each quiz</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
         <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div><div class="s-desc">Randomize option order</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
+        <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">Max questions per quiz (0 = all)</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
         <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
         <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
         <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
@@ -507,7 +508,6 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
             </svg>
             <div class="r-txt" id="ringTxt">60</div>
           </div>
-          <div class="timer-box" id="qTimerBox"><span class="t-lbl">Question</span><span class="t-val" id="qTimerVal">1:00</span></div>
         </div>
       </div>
       <div class="question-card anim" id="questionCard">
@@ -993,6 +993,9 @@ function startQuiz(){
   if(document.getElementById('settFlaggedOnly').checked) pool=pool.filter(isFlagged);
   if(!pool.length) return alert('No questions to quiz!');
   if(document.getElementById('settShuffle').checked) pool.sort(()=>Math.random()-.5);
+  // Apply question limit — always shuffle first so limit picks a random subset
+  const limit=parseInt(document.getElementById('settQLimit').value)||0;
+  if(limit>0 && limit<pool.length) pool=pool.slice(0,limit);
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
@@ -1013,15 +1016,13 @@ function startQTimer(){
   qInterval=setInterval(()=>{ qSec--; updateQTimer(); if(qSec<=0){clearInterval(qInterval);onTimeout();} },1000);
 }
 function updateQTimer(){
-  const m=Math.floor(qSec/60), s=(qSec%60).toString().padStart(2,'0');
-  document.getElementById('qTimerVal').textContent=`${m}:${s}`;
   document.getElementById('ringTxt').textContent=qSec<=99?qSec:'∞';
   const circ=113.1, pct=Math.max(0,qSec/qMaxSec);
-  document.getElementById('ringFill').style.strokeDashoffset=circ*(1-pct);
-  const box=document.getElementById('qTimerBox'), ring=document.getElementById('ringFill'), rtxt=document.getElementById('ringTxt');
-  if(pct>.5){box.className='timer-box';ring.style.stroke='var(--accent)';rtxt.style.color='var(--accent)';}
-  else if(pct>.25){box.className='timer-box warn';ring.style.stroke='var(--orange)';rtxt.style.color='var(--orange)';}
-  else{box.className='timer-box danger';ring.style.stroke='var(--red)';rtxt.style.color='var(--red)';}
+  const ring=document.getElementById('ringFill'), rtxt=document.getElementById('ringTxt');
+  ring.style.strokeDashoffset=circ*(1-pct);
+  if(pct>.5){ring.style.stroke='var(--accent)';rtxt.style.color='var(--accent)';}
+  else if(pct>.25){ring.style.stroke='var(--orange)';rtxt.style.color='var(--orange)';}
+  else{ring.style.stroke='var(--red)';rtxt.style.color='var(--red)';}
 }
 function onTimeout(){
   if(answered) return; answered=true; quiz.timeouts++;
