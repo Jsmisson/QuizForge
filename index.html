@@ -982,7 +982,7 @@ function importBank(evt){
         showHomeMsg(`✓ Created "${name}" with ${data.questions.length} question(s).`,true);
       } else throw new Error();
       renderSetsGrid();
-    }catch(){ showHomeMsg('✗ Invalid file.',false); }
+    }catch(err){ showHomeMsg('✗ Invalid file.',false); }
     evt.target.value='';
   };
   reader.readAsText(file);
@@ -1101,7 +1101,7 @@ function showResults(){
   const total=quiz.questions.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
   document.getElementById('resultScore').textContent=pct+'%';
   document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
-  document.getElementById('resultLabel').textContent=pass?'🎉 Great work! You passed.':'📚 Keep studying — you\'ll get there.';
+  document.getElementById('resultLabel').textContent=pass?'🎉 Great work! You passed.':'📚 Keep studying - you will get there!';
   document.getElementById('rCorrect').textContent=quiz.score;
   document.getElementById('rWrong').textContent=total-quiz.score-quiz.timeouts;
   document.getElementById('rTimeout').textContent=quiz.timeouts;
