@@ -87,7 +87,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .sets-header-text h2{font-size:1rem;font-weight:700;margin-bottom:3px}
 .sets-header-text p{font-size:.78rem;color:var(--muted)}
 .sets-header-actions{display:flex;gap:8px;flex-wrap:wrap}
-.sets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:12px;margin-bottom:16px}
+.sets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;width:100%}
 .set-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
   padding:18px;cursor:pointer;transition:all .18s;position:relative;min-height:100px}
 .set-card:active{border-color:var(--accent);transform:scale(.98)}
@@ -697,20 +697,35 @@ function renderHeader(){
 function renderSetsGrid(){
   const sets=loadSets();
   const grid=document.getElementById('setsGrid');
-  let html=sets.map(s=>{
-    const qs=loadQs(s.id), fl=loadFlags(s.id), isActive=s.id===activeSetId;
-    return `<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
-      <div class="set-card-actions">
-        <button class="icon-btn" style="font-size:.85rem;min-width:36px;min-height:36px" onclick="event.stopPropagation();startRenameCard('${s.id}')" title="Rename">✏️</button>
-        <button class="icon-btn" style="min-width:36px;min-height:36px" onclick="event.stopPropagation();deleteSet('${s.id}')" title="Delete">🗑</button>
-      </div>
-      <div class="set-card-name" id="sname-${s.id}">${esc(s.name)}</div>
-      <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''} · ${fl.length} flagged</div>
-      ${isActive?'<span class="set-card-badge">Active</span>':''}
-    </div>`;
-  }).join('');
+  if(!grid) return;
+  let html='';
+  if(sets && sets.length){
+    html=sets.map(s=>{
+      const qs=loadQs(s.id)||[], fl=loadFlags(s.id)||[], isActive=s.id===activeSetId;
+      return `<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
+        <div class="set-card-actions">
+          <button class="icon-btn" style="font-size:.85rem;min-width:36px;min-height:36px" onclick="event.stopPropagation();startRenameCard('${s.id}')" title="Rename">✏️</button>
+          <button class="icon-btn" style="min-width:36px;min-height:36px" onclick="event.stopPropagation();deleteSet('${s.id}')" title="Delete">🗑</button>
+        </div>
+        <div class="set-card-name" id="sname-${s.id}">${esc(s.name)}</div>
+        <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''} · ${fl.length} flagged</div>
+        ${isActive?'<span class="set-card-badge">Active</span>':''}
+      </div>`;
+    }).join('');
+  }
   html+=`<div class="new-set-card" onclick="createSet()"><div class="plus">＋</div><div>New Set</div></div>`;
   grid.innerHTML=html;
+  // Also show a prominent button below the grid as fallback
+  const existing=document.getElementById('createSetFallback');
+  if(sets.length===0 && !existing){
+    const btn=document.createElement('button');
+    btn.id='createSetFallback';
+    btn.className='btn btn-primary';
+    btn.style='width:100%;margin-top:12px;padding:16px;font-size:1rem';
+    btn.textContent='+ Create Your First Set';
+    btn.onclick=createSet;
+    grid.parentNode.insertBefore(btn, grid.nextSibling);
+  }
 }
 
 function openSet(id){
@@ -1110,20 +1125,20 @@ function endQuiz(){
 //  INIT
 // ═══════════════════════════════════════════════════
 function init(){
-  try{ migrateLegacy(); } catch(e){}
-  // Always ensure at least one set exists
-  let sets = loadSets();
-  if(!sets || !sets.length){
-    const id = uid();
-    sets = [{id, name:'Default Set', created:Date.now()}];
-    saveSets(sets);
-  }
-  renderSetsGrid();
-  renderHeader();
+  try{ migrateLegacy(); } catch(e){ console.log('migrate err',e); }
+  try{
+    let sets = loadSets();
+    if(!sets || !Array.isArray(sets) || sets.length===0){
+      const id = uid();
+      sets = [{id:id, name:'Default Set', created:Date.now()}];
+      saveSets(sets);
+    }
+  } catch(e){ console.log('sets init err',e); }
+  try{ renderSetsGrid(); } catch(e){ console.log('grid err',e); }
+  try{ renderHeader(); } catch(e){}
   try{ initOptionRows(); } catch(e){}
 }
 
-// Run after DOM is fully ready
 if(document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', init);
 } else {
