@@ -715,17 +715,6 @@ function renderSetsGrid(){
   }
   html+=`<div class="new-set-card" onclick="createSet()"><div class="plus">＋</div><div>New Set</div></div>`;
   grid.innerHTML=html;
-  // Also show a prominent button below the grid as fallback
-  const existing=document.getElementById('createSetFallback');
-  if(sets.length===0 && !existing){
-    const btn=document.createElement('button');
-    btn.id='createSetFallback';
-    btn.className='btn btn-primary';
-    btn.style='width:100%;margin-top:12px;padding:16px;font-size:1rem';
-    btn.textContent='+ Create Your First Set';
-    btn.onclick=createSet;
-    grid.parentNode.insertBefore(btn, grid.nextSibling);
-  }
 }
 
 function openSet(id){
