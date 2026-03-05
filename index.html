@@ -1109,9 +1109,26 @@ function endQuiz(){
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
-migrateLegacy();
-if(!loadSets().length) saveSets([{id:uid(),name:'Default Set',created:Date.now()}]);
-renderSetsGrid(); renderHeader(); initOptionRows();
+function init(){
+  try{ migrateLegacy(); } catch(e){}
+  // Always ensure at least one set exists
+  let sets = loadSets();
+  if(!sets || !sets.length){
+    const id = uid();
+    sets = [{id, name:'Default Set', created:Date.now()}];
+    saveSets(sets);
+  }
+  renderSetsGrid();
+  renderHeader();
+  try{ initOptionRows(); } catch(e){}
+}
+
+// Run after DOM is fully ready
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 </script>
 </body>
 </html>
