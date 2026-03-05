@@ -1,4 +1,4 @@
-const CACHE = 'quizforge-v1';
+const CACHE = 'quizforge-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
