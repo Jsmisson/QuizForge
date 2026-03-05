@@ -365,7 +365,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         <p>Each set has its own questions and flags.</p>
       </div>
       <div class="sets-header-actions">
-        <button class="btn btn-ghost btn-sm" onclick="exportAll()">⬇ Export All</button>
+        <button class="btn btn-ghost btn-sm" onclick="openExportModal()">⬇ Export</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆ Import
           <input type="file" accept=".qforge,.json" style="display:none" onchange="importBank(event)">
         </label>
@@ -555,6 +555,23 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
   </div><!-- /innerApp -->
 </div><!-- /app -->
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal" style="display:none" onclick="closeExportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">Export Sets</div>
+    <div style="margin-bottom:14px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="exportSelectAll()">Select All</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportSelectNone()">Clear</button>
+    </div>
+    <div id="exportSetList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;margin-bottom:16px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeExportModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="exportSelected()">⬇ Export Selected</button>
+    </div>
+  </div>
+</div>
 
 <!-- EDIT MODAL -->
 <div class="modal-overlay" id="editModal" style="display:none" onclick="closeEditModal(event)">
@@ -952,6 +969,49 @@ function exportCurrentSet(){
   const sets=loadSets(), s=sets.find(x=>x.id===activeSetId);
   const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions,flaggedKeys};
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
+}
+function openExportModal(){
+  const sets=loadSets();
+  if(!sets.length) return showHomeMsg('No sets to export.',false);
+  const list=document.getElementById('exportSetList');
+  list.innerHTML=sets.map(s=>{
+    const qs=loadQs(s.id)||[];
+    return `<label style="display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer">
+      <input type="checkbox" class="export-set-check" data-id="${s.id}" checked style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0">
+      <div>
+        <div style="font-size:.9rem;font-weight:600">${esc(s.name)}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${qs.length} question${qs.length!==1?'s':''}</div>
+      </div>
+    </label>`;
+  }).join('');
+  document.getElementById('exportModal').style.display='flex';
+}
+function closeExportModal(e){
+  if(e&&e.target!==document.getElementById('exportModal')) return;
+  document.getElementById('exportModal').style.display='none';
+}
+function exportSelectAll(){
+  document.querySelectorAll('.export-set-check').forEach(c=>c.checked=true);
+}
+function exportSelectNone(){
+  document.querySelectorAll('.export-set-check').forEach(c=>c.checked=false);
+}
+function exportSelected(){
+  const checked=[...document.querySelectorAll('.export-set-check:checked')].map(c=>c.dataset.id);
+  if(!checked.length) return alert('Select at least one set.');
+  const sets=loadSets().filter(s=>checked.includes(s.id));
+  if(checked.length===1){
+    // Single set — export as single set file
+    const s=sets[0];
+    const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)};
+    dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
+  } else {
+    // Multiple sets — export as multi-set file
+    const payload={version:2,exported:new Date().toISOString(),sets:sets.map(s=>({id:s.id,name:s.name,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)}))};
+    dlBlob(JSON.stringify(payload,null,2),`quizforge-${sets.length}sets-${new Date().toISOString().slice(0,10)}.json`);
+  }
+  document.getElementById('exportModal').style.display='none';
+  showHomeMsg(`✓ Exported ${checked.length} set(s).`,true);
 }
 function exportAll(){
   const sets=loadSets(); if(!sets.length) return showHomeMsg('No sets to export.',false);
