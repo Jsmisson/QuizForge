@@ -3304,12 +3304,19 @@ const GDRIVE = (() => {
 
   async function _writeFile(id, payload){
     const body = JSON.stringify(payload);
-    console.log('[QuizForge Sync] writeFile id:', id, 'sets:', payload.sets ? payload.sets.length : 0);
+    const byteSize = new Blob([body]).size;
+    console.log('[QuizForge Sync] writeFile id:', id, 'sets:', payload.sets ? payload.sets.length : 0, 'bytes:', byteSize, 'images:', Object.keys(payload.images||{}).length);
     if(id){
-      // Update existing file
+      // Use multipart upload so we're not limited to 5MB simple upload
+      const meta = JSON.stringify({ name: FILE_NAME });
+      const boundary = 'qforge_boundary_' + Date.now();
+      const multipartBody =
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+        `--${boundary}\r\nContent-Type: ${MIME}\r\n\r\n${body}\r\n` +
+        `--${boundary}--`;
       const r = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
-        { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type':MIME }, body }
+        `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`,
+        { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipartBody }
       );
       const d = await r.json();
       console.log('[QuizForge Sync] writeFile update response:', d);
@@ -3524,15 +3531,17 @@ const GDRIVE = (() => {
       _setStatus('Synced ' + t, 'ok');
       localStorage.setItem('qforge_gdrive_lastSync', Date.now());
     } catch(e){
-      console.error('[QuizForge Sync] syncNow error:', e.message);
+      console.error('[QuizForge Sync] syncNow error:', e.message, e);
       if(e.message && (e.message.includes('401') || e.message.includes('Invalid Credentials') || e.message.includes('invalid_token'))){
         _token = null;
         localStorage.removeItem('qforge_gdrive_token');
         localStorage.removeItem('qforge_gdrive_token_expiry');
         _setStatus('Reconnecting…', 'busy');
         _silentReauth();
+      } else if(e.message && e.message.includes('Failed to fetch')){
+        _setStatus('Offline — will retry', 'err');
       } else {
-        _setStatus('Sync unavailable', 'err');
+        _setStatus('Sync error — check console', 'err');
       }
     } finally {
       _syncing = false;
