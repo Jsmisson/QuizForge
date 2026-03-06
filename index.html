@@ -2776,13 +2776,23 @@ const GDRIVE = (() => {
   // ── Drive file helpers (appDataFolder — private to this app) ──
   async function _findFile(){
     const r = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id,name)`,
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,
       { headers: { Authorization: 'Bearer ' + _token } }
     );
     const d = await r.json();
-    console.log('[QuizForge Sync] findFile response:', d);
+    console.log('[QuizForge Sync] findFile — all matches:', JSON.stringify(d.files));
     if(d.error){ throw new Error('findFile: ' + d.error.message); }
-    return (d.files && d.files.length) ? d.files[0].id : null;
+    if(!d.files || !d.files.length) return null;
+    // Clean up duplicate files — keep most recently modified, delete the rest
+    if(d.files.length > 1){
+      console.warn('[QuizForge Sync] found', d.files.length, 'sync files — deleting duplicates');
+      for(let i = 1; i < d.files.length; i++){
+        await fetch(`https://www.googleapis.com/drive/v3/files/${d.files[i].id}`,
+          { method:'DELETE', headers:{ Authorization:'Bearer '+_token } });
+        console.log('[QuizForge Sync] deleted duplicate:', d.files[i].id);
+      }
+    }
+    return d.files[0].id;
   }
 
   async function _readFile(id){
@@ -2918,6 +2928,7 @@ const GDRIVE = (() => {
   async function syncNow(){
     if(!_token || _syncing) return;
     _syncing = true;
+    _fileId = null; // always re-lookup to avoid stale cached ID
     _setStatus('Syncing…', 'busy');
     try{
       // 1. Find or create cloud file
