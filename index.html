@@ -818,7 +818,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 
     <div class="modal-footer" style="margin-top:16px">
       <button class="btn btn-ghost" onclick="closePreQuizModal()">Cancel</button>
-      <button class="btn btn-primary" style="padding:12px 28px;font-size:.95rem" onclick="closePreQuizModal();startQuiz()">▶ Start</button>
+      <button class="btn btn-primary" style="padding:12px 28px;font-size:.95rem" onclick="saveQuizSettings();closePreQuizModal();startQuiz()">▶ Start</button>
     </div>
   </div>
 </div>
@@ -1729,6 +1729,7 @@ function openPreQuizModal(){
 }
 function closePreQuizModal(e){
   if(e&&e.target!==document.getElementById('preQuizModal')) return;
+  saveQuizSettings();
   modalClose('preQuizModal');
 }
 function openImportExportModal(){
@@ -1991,6 +1992,7 @@ function importFullBackup(evt){
         set('settAutoAdvance',s.autoAdvance); set('settQLimit',s.qLimit||'0');
         if(s.cardFirst) set('settCardFirst',s.cardFirst);
         if(s.cardsOnly!==undefined) set('settCardsOnly',s.cardsOnly);
+        saveQuizSettings();
       }
       showHomeMsg(`✓ Backup restored — ${newSets.length} set(s) loaded.`,true);
       renderSetsGrid();
@@ -2618,6 +2620,41 @@ function _updateSoundToggle(){
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
+function saveQuizSettings(){
+  const get = id => { const el=document.getElementById(id); if(!el) return null; return el.type==='checkbox'?el.checked:el.value; };
+  const s = {
+    shuffle:     get('settShuffle'),
+    shuffleOpts: get('settShuffleOpts'),
+    qLimit:      get('settQLimit'),
+    feedback:    get('settFeedback'),
+    flaggedOnly: get('settFlaggedOnly'),
+    explain:     get('settExplain'),
+    cardsOnly:   get('settCardsOnly'),
+    cardFirst:   get('settCardFirst'),
+    srsOnly:     get('settSRSOnly'),
+    qTimer:      get('settQTimer'),
+    autoAdvance: get('settAutoAdvance'),
+  };
+  localStorage.setItem('qforge_quiz_settings', JSON.stringify(s));
+}
+function loadQuizSettings(){
+  try{
+    const s = JSON.parse(localStorage.getItem('qforge_quiz_settings')||'{}');
+    const set = (id, val) => { if(val===null||val===undefined) return; const el=document.getElementById(id); if(!el) return; el.type==='checkbox'?el.checked=val:el.value=val; };
+    set('settShuffle',     s.shuffle);
+    set('settShuffleOpts', s.shuffleOpts);
+    set('settQLimit',      s.qLimit);
+    set('settFeedback',    s.feedback);
+    set('settFlaggedOnly', s.flaggedOnly);
+    set('settExplain',     s.explain);
+    set('settCardsOnly',   s.cardsOnly);
+    set('settCardFirst',   s.cardFirst);
+    set('settSRSOnly',     s.srsOnly);
+    set('settQTimer',      s.qTimer);
+    set('settAutoAdvance', s.autoAdvance);
+  } catch(e){}
+}
+
 function init(){
   try{ migrateLegacy(); } catch(e){ console.log('migrate err',e); }
   try{
@@ -2628,11 +2665,11 @@ function init(){
       saveSets(sets);
     }
   } catch(e){ console.log('sets init err',e); }
+  try{ loadQuizSettings(); } catch(e){}
+  try{ _updateSoundToggle(); } catch(e){}
   try{ renderSetsGrid(); } catch(e){ console.log('grid err',e); }
   try{ renderHeader(); } catch(e){}
   try{ initOptionRows(); } catch(e){}
-  // Init Google Drive sync strip (token restore + strip render)
-  // syncBarWrap is inside modal so rendered on modal open instead
   setTimeout(()=>{ try{ GDRIVE.initSync(); } catch(e){} }, 0);
 }
 
