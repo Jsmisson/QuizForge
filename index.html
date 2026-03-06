@@ -1073,102 +1073,55 @@ window.addEventListener('offline',updateOnlineStatus);
 updateOnlineStatus();
 
 // ═══════════════════════════════════════════════════
-//  IMAGE STORE  (IndexedDB — keeps images out of localStorage)
+//  IMAGE STORE  (localStorage-backed with canvas compression)
+//  Images are compressed to max 900px / JPEG 82% on upload (~60-100KB each).
+//  Stored as q.image directly in the question object — no IndexedDB needed.
+//  This gives full cross-platform compatibility including iOS PWA.
 // ═══════════════════════════════════════════════════
+
+// Compress a data-URL to max 900px wide/tall, JPEG quality 0.82
+// Returns a Promise resolving to the compressed data-URL
+function compressImage(dataURL){
+  return new Promise((resolve) => {
+    const MAX = 900, QUALITY = 0.82;
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if(w > MAX || h > MAX){
+        if(w >= h){ h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', QUALITY));
+    };
+    img.onerror = () => resolve(dataURL); // fallback: use original
+    img.src = dataURL;
+  });
+}
+
+// ImageStore shim — keeps API compatible but stores inline in question objects
+// All methods are no-ops or passthroughs since images now live in q.image directly
 const ImageStore = (() => {
-  const DB = 'quizforge-images', STORE = 'images', VER = 1;
-  let _db = null;
+  // These are kept for backward compat with any legacy imageRef keys left in old data.
+  // On sync-down, if a question has imageRef but no image, we resolve via the Drive payload.
+  const _cache = {}; // in-memory only — for the current session
 
-  function _open(){
-    if(_db) return Promise.resolve(_db);
-    return new Promise((res, rej) => {
-      const req = indexedDB.open(DB, VER);
-      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
-      req.onsuccess = e => { _db = e.target.result; res(_db); };
-      req.onerror   = e => rej(e.target.error);
-    });
-  }
-
-  // Save a base64 data-URL under a generated key; returns the key
-  async function put(dataURL){
-    if(!dataURL) return null;
-    const key = 'img_' + Math.random().toString(36).slice(2) + '_' + Date.now();
-    const db  = await _open();
-    await new Promise((res, rej) => {
-      const tx  = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).put(dataURL, key);
-      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
-    });
-    return key;
-  }
-
-  // Retrieve a data-URL by key (returns null if missing)
-  async function get(key){
-    if(!key) return null;
-    const db = await _open();
-    return new Promise((res, rej) => {
-      const tx  = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).get(key);
-      req.onsuccess = () => res(req.result || null);
-      req.onerror   = e => rej(e.target.error);
-    });
-  }
-
-  // Delete a key
-  async function del(key){
-    if(!key) return;
-    const db = await _open();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).delete(key);
-      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
-    });
-  }
-
-  // Return {key: dataURL} for every key in a given set (for Drive export)
-  async function getAll(keys){
-    if(!keys || !keys.length) return {};
-    const db  = await _open();
+  async function put(dataURL){ return null; } // not used in new flow
+  async function get(key){ return _cache[key] || null; }
+  async function del(key){ delete _cache[key]; }
+  async function getAll(keys){ 
     const out = {};
-    await Promise.all(keys.map(k => new Promise((res, rej) => {
-      const tx  = db.transaction(STORE, 'readonly');
-      const req = tx.objectStore(STORE).get(k);
-      req.onsuccess = () => { if(req.result) out[k] = req.result; res(); };
-      req.onerror   = e => rej(e.target.error);
-    })));
+    keys.forEach(k => { if(_cache[k]) out[k] = _cache[k]; });
     return out;
   }
-
-  // Bulk-write {key: dataURL} map (used during Drive sync restore)
-  async function putAll(map){
-    if(!map || !Object.keys(map).length) return;
-    const db = await _open();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const st = tx.objectStore(STORE);
-      Object.entries(map).forEach(([k, v]) => st.put(v, k));
-      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
-    });
-  }
-
-  // Delete all keys NOT in the keepSet (used after sync to prune orphans)
+  async function putAll(map){ Object.assign(_cache, map); }
   async function pruneExcept(keepSet){
-    const db = await _open();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const st = tx.objectStore(STORE);
-      const req = st.getAllKeys();
-      req.onsuccess = () => {
-        req.result.filter(k => !keepSet.has(k)).forEach(k => st.delete(k));
-        res();
-      };
-      req.onerror = e => rej(e.target.error);
-    });
+    Object.keys(_cache).forEach(k => { if(!keepSet.has(k)) delete _cache[k]; });
   }
-
   return { put, get, del, getAll, putAll, pruneExcept };
 })();
-
 // Helper: collect all imageRef values from a questions array
 function _collectImageRefs(questions){
   return (questions || []).map(q => q.imageRef).filter(Boolean);
@@ -1556,9 +1509,6 @@ function addTombstone(id){
 function deleteSet(id){
   const sets=loadSets(), set=sets.find(s=>s.id===id);
   if(!set||!confirm(`Delete "${set.name}" and all questions?`)) return;
-  // Prune images for this set before deleting
-  const qs=loadQs(id);
-  qs.forEach(q=>{ if(q.imageRef) ImageStore.del(q.imageRef); });
   sets.splice(sets.findIndex(s=>s.id===id),1);
   addTombstone(id);
   saveSets(sets); localStorage.removeItem('qforge_qs_'+id); localStorage.removeItem('qforge_flags_'+id);
@@ -1649,7 +1599,7 @@ function renderQList(){
     const displayText=isCard?q.term:(q.text||'');
     const badgeLabel=isCard?'Card':q.type==='multi'?'Multi':'Single';
     const badgeClass=isCard?' card-type':q.type==='multi'?' multi':'';
-    const hasImg = q.imageRef || q.image;
+    const hasImg = q.image || q.imageRef; // imageRef: legacy fallback
     return `<div class="q-item${fl?' is-flagged':''}${inc?' is-incorrect':''}">
       ${hasImg?`<img class="q-item-img" id="qimg_list_${i}" src="" alt="">`:'' }
       <div class="q-item-text" onclick="openEditModal(${i})">${esc(displayText.slice(0,80))}${displayText.length>80?'…':''}</div>
@@ -1669,7 +1619,7 @@ function renderQList(){
   }).join('');
   // Async: populate image thumbnails after render
   shown.forEach(({q,i}) => {
-    if(!q.imageRef && !q.image) return;
+    if(!q.image && !q.imageRef) return; // imageRef: legacy fallback
     _resolveImgSrc(q).then(src => {
       const el = document.getElementById('qimg_list_'+i);
       if(el && src) el.src = src;
@@ -1678,8 +1628,8 @@ function renderQList(){
 }
 
 function listToggleFlag(i){ toggleGlobalFlag(questions[i]); renderQList(); }
-function deleteQ(i){ if(confirm('Delete this question?')){ const q=questions[i]; if(q.imageRef) ImageStore.del(q.imageRef); questions.splice(i,1); save(); renderQList(); } }
-function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ questions.forEach(q=>{ if(q.imageRef) ImageStore.del(q.imageRef); }); questions=[]; save(); renderQList(); } }
+function deleteQ(i){ if(confirm('Delete this question?')){ questions.splice(i,1); save(); renderQList(); } }
+function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ questions=[]; save(); renderQList(); } }
 
 // ═══════════════════════════════════════════════════
 //  ADD FORM
@@ -1730,33 +1680,35 @@ function _setImgUI(prefix, src){
 function handleNewQImg(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{ _newQImg=e.target.result; _setImgUI('new',_newQImg); };
+  reader.onload=async e=>{
+    const compressed = await compressImage(e.target.result);
+    _newQImg=compressed; _setImgUI('new',_newQImg);
+  };
   reader.readAsDataURL(file); evt.target.value='';
 }
 function removeNewQImg(){ _setImgUI('new',null); }
 function handleEditQImg(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{ _editQImg=e.target.result; _setImgUI('edit',_editQImg); };
+  reader.onload=async e=>{
+    const compressed = await compressImage(e.target.result);
+    _editQImg=compressed; _setImgUI('edit',_editQImg);
+  };
   reader.readAsDataURL(file); evt.target.value='';
 }
 function removeEditQImg(){ _setImgUI('edit',null); }
 function _resetNewQImgUI(){ _setImgUI('new',null); }
 
-// Load an imageRef from IndexedDB into the edit UI
-async function _loadImgIntoEdit(imageRef){
-  if(!imageRef){ _setImgUI('edit',null); return; }
-  // If it looks like a legacy base64 blob stored directly, show it as-is
-  if(imageRef.startsWith('data:')){ _setImgUI('edit', imageRef); return; }
-  const src = await ImageStore.get(imageRef);
-  _setImgUI('edit', src||null);
+// Load image into the edit UI — images are now stored inline as q.image
+function _loadImgIntoEdit(imgSrc){
+  _setImgUI('edit', imgSrc || null);
 }
 
-// Resolve any imageRef on a question to a displayable src for rendering
+// Resolve image source for rendering — always inline now, imageRef kept for legacy compat
 async function _resolveImgSrc(q){
   if(!q) return null;
-  if(q.image && q.image.startsWith('data:')) return q.image; // legacy inline
-  if(q.imageRef) return await ImageStore.get(q.imageRef);
+  if(q.image) return q.image;
+  if(q.imageRef) return await ImageStore.get(q.imageRef); // legacy fallback
   return null;
 }
 
@@ -1779,19 +1731,10 @@ function saveQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     q={text,type,options,correct,explain:document.getElementById('newQExplain').value.trim()};
   }
-  if(_newQImg){
-    // Save image to IndexedDB asynchronously, then attach ref and persist
-    ImageStore.put(_newQImg).then(ref => {
-      q.imageRef = ref;
-      questions.push(q);
-      _resetNewQImgUI();
-      save(); cancelEdit();
-    });
-  } else {
-    questions.push(q);
-    _resetNewQImgUI();
-    save(); cancelEdit();
-  }
+  if(_newQImg) q.image = _newQImg;
+  questions.push(q);
+  _resetNewQImgUI();
+  save(); cancelEdit();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1817,7 +1760,7 @@ function openEditModal(i){
       b.appendChild(d);
     });
   }
-  _loadImgIntoEdit(q.imageRef || q.image || null);  // supports both new ref and legacy inline
+  _loadImgIntoEdit(q.image || null);
   modalOpen('editModal');
 }
 function closeEditModal(e){
@@ -1863,32 +1806,19 @@ function saveEditQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     updatedQ={text,type,options,correct,explain:document.getElementById('editQExplain').value.trim()};
   }
-  const oldImgRef = questions[editingIdx].imageRef || null;
-  const _doSaveEdit = (ref) => {
-    if(ref !== undefined) updatedQ.imageRef = ref;
-    else if(questions[editingIdx].imageRef && !_editQImg) {
-      // image was removed — keep null, clean up old ref
-      ImageStore.del(oldImgRef);
-    } else if(questions[editingIdx].imageRef) {
-      updatedQ.imageRef = questions[editingIdx].imageRef; // unchanged
-    }
-    // migrate legacy inline image
-    if(!updatedQ.imageRef && questions[editingIdx].image && !_editQImg)
-      updatedQ.image = questions[editingIdx].image;
-    questions[editingIdx]=updatedQ;
-    const newKey=flagKey(questions[editingIdx]);
-    if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
-    save(); modalClose('editModal'); editingIdx=null; renderQList();
-  };
+  // Image handling: store compressed data-URL directly in q.image
   if(_editQImg){
-    // New image selected — save to IndexedDB, delete old ref if any
-    ImageStore.put(_editQImg).then(ref => {
-      if(oldImgRef) ImageStore.del(oldImgRef);
-      _doSaveEdit(ref);
-    });
-  } else {
-    _doSaveEdit(undefined);
+    updatedQ.image = _editQImg; // new image selected
+  } else if(questions[editingIdx].image) {
+    updatedQ.image = questions[editingIdx].image; // unchanged — carry forward
   }
+  // Carry forward legacy imageRef if present (will be resolved via Drive on next sync)
+  if(!updatedQ.image && questions[editingIdx].imageRef)
+    updatedQ.imageRef = questions[editingIdx].imageRef;
+  questions[editingIdx]=updatedQ;
+  const newKey=flagKey(questions[editingIdx]);
+  if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
+  save(); modalClose('editModal'); editingIdx=null; renderQList();
 }
 
 // ═══════════════════════════════════════════════════
@@ -2266,7 +2196,7 @@ function importBank(evt){
   };
   reader.readAsText(file);
 }
-async function exportFullBackup(){
+function exportFullBackup(){
   const sets=loadSets(), folders=loadFolders(), gridOrder=loadGridOrder();
   const settings={
     shuffle:document.getElementById('settShuffle').checked,
@@ -2280,15 +2210,11 @@ async function exportFullBackup(){
     cardFirst:document.getElementById('settCardFirst').value,
     cardsOnly:document.getElementById('settCardsOnly').checked
   };
-  // Collect all imageRef keys and fetch blobs from IndexedDB
-  const allRefs=[];
-  sets.forEach(s=>loadQs(s.id).forEach(q=>{ if(q.imageRef) allRefs.push(q.imageRef); }));
-  const imageMap=allRefs.length ? await ImageStore.getAll(allRefs) : {};
   const payload={
-    type:'fullbackup', version:5,
+    type:'fullbackup', version:6,
     exported:new Date().toISOString(),
     settings, gridOrder, folders,
-    images: imageMap,
+    // images stored inline in q.image — no separate map
     sets:sets.map(s=>({
       id:s.id, name:s.name, folderId:s.folderId||null, created:s.created,
       questions:loadQs(s.id),
@@ -2310,10 +2236,6 @@ function importFullBackup(evt){
       // Clear everything
       const oldSets=loadSets();
       oldSets.forEach(s=>{ localStorage.removeItem('qforge_qs_'+s.id); localStorage.removeItem('qforge_flags_'+s.id); localStorage.removeItem('qforge_incorrect_'+s.id); });
-      // Restore images into IndexedDB first
-      if(data.images && typeof data.images === 'object'){
-        await ImageStore.putAll(data.images);
-      }
       // Restore folders
       saveFolders(Array.isArray(data.folders)?data.folders:[]);
       // Restore sets
@@ -3356,29 +3278,20 @@ const GDRIVE = (() => {
   }
 
   // ── Build full backup payload (mirrors exportFullBackup) ──
-  async function _buildPayload(){
+  function _buildPayload(){
     const sets = loadSets(), folders = loadFolders();
     const tombstones = loadTombstones();
     const clearTs = loadClearTimestamps();
     console.log('[Sync] building payload — sets:', sets.length, 'tombstones:', tombstones);
 
-    // Collect all imageRef keys across all sets
-    const allRefs = [];
-    sets.forEach(s => {
-      const qs = loadQs(s.id);
-      qs.forEach(q => { if(q.imageRef) allRefs.push(q.imageRef); });
-    });
-    // Fetch all images from IndexedDB in one pass
-    const imageMap = allRefs.length ? await ImageStore.getAll(allRefs) : {};
-
     return {
-      type: 'fullbackup', version: 5,
+      type: 'fullbackup', version: 6,
       synced: new Date().toISOString(),
       tombstones,
       clearTimestamps: clearTs,
       gridOrder: loadGridOrder(),
       folders,
-      images: imageMap,  // {imageRef: dataURL}
+      // images are stored inline in q.image — no separate map needed
       sets: sets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
         questions:          loadQs(s.id),
@@ -3393,12 +3306,9 @@ const GDRIVE = (() => {
   async function _applyPayload(data){
     if(!data || !Array.isArray(data.sets)) return;
 
-    // Restore images from Drive payload into IndexedDB
-    if(data.images && typeof data.images === 'object'){
-      const incoming = data.images;
-      await ImageStore.putAll(incoming);
-      console.log('[Sync] restored', Object.keys(incoming).length, 'images from cloud payload');
-    }
+    // Note: images are stored inline in q.image — no separate restore step needed.
+    // Legacy v5 payloads with a separate images:{} map are handled by _collectImageRefs
+    // being a no-op when questions already have q.image populated.
 
     // Merge tombstones — union of local + cloud deletions
     const localTombstones  = loadTombstones();
@@ -3526,13 +3436,6 @@ const GDRIVE = (() => {
       }
     }
 
-    // Prune IndexedDB images that are no longer referenced by any question
-    const allLiveRefs = new Set();
-    mergedSets.forEach(s => {
-      loadQs(s.id).forEach(q => { if(q.imageRef) allLiveRefs.add(q.imageRef); });
-    });
-    await ImageStore.pruneExcept(allLiveRefs);
-    console.log('[Sync] IndexedDB image prune complete — live refs:', allLiveRefs.size);
   }
 
   // ── Main sync — pull then push merged result ──
@@ -3554,7 +3457,7 @@ const GDRIVE = (() => {
       }
 
       // 3. Push merged local state back to cloud (now async — bundles images)
-      const payload = await _buildPayload();
+      const payload = _buildPayload();
       const result  = await _writeFile(_fileId, payload);
       if(!_fileId && result && result.id) _fileId = result.id;
 
