@@ -3160,7 +3160,16 @@ const GDRIVE = (() => {
       scope: SCOPE,
       prompt: '',
       callback: async (resp) => {
-        if(resp.error){ console.warn('[Sync] silent re-auth failed:', resp.error); _setStatus('Session expired — sign in again', 'err'); _token=null; localStorage.removeItem('qforge_gdrive_token'); localStorage.removeItem('qforge_gdrive_token_expiry'); _renderBar(); return; }
+        if(resp.error){
+          console.warn('[Sync] silent re-auth failed:', resp.error);
+          // Silent reauth fails on iOS Safari PWA mode — fall back to showing sign-in prompt
+          _token = null;
+          localStorage.removeItem('qforge_gdrive_token');
+          localStorage.removeItem('qforge_gdrive_token_expiry');
+          _setStatus('Tap to sign in again', 'err');
+          _renderBar(); // puts UI back to sign-in state
+          return;
+        }
         _token = resp.access_token;
         const expiry = Date.now() + 55 * 60 * 1000;
         localStorage.setItem('qforge_gdrive_token', _token);
@@ -3244,36 +3253,36 @@ const GDRIVE = (() => {
   async function _writeFile(id, payload){
     const body = JSON.stringify(payload);
     const byteSize = new Blob([body]).size;
-    console.log('[QuizForge Sync] writeFile id:', id, 'sets:', payload.sets ? payload.sets.length : 0, 'bytes:', byteSize, 'images:', Object.keys(payload.images||{}).length);
-    if(id){
-      // Use multipart upload so we're not limited to 5MB simple upload
-      const meta = JSON.stringify({ name: FILE_NAME });
-      const boundary = 'qforge_boundary_' + Date.now();
-      const multipartBody =
-        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
-        `--${boundary}\r\nContent-Type: ${MIME}\r\n\r\n${body}\r\n` +
-        `--${boundary}--`;
-      const r = await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`,
-        { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type': `multipart/related; boundary=${boundary}` }, body: multipartBody }
-      );
-      const d = await r.json();
-      console.log('[QuizForge Sync] writeFile update response:', d);
-      if(d.error){ throw new Error('writeFile update: ' + d.error.message); }
-      return d;
-    }
-    // Create new file in appDataFolder
-    const meta = JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] });
-    const form = new FormData();
-    form.append('metadata', new Blob([meta], { type:'application/json' }));
-    form.append('file',     new Blob([body],  { type: MIME }));
-    const r = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-      { method:'POST', headers:{ Authorization:'Bearer '+_token }, body: form }
+    console.log('[QuizForge Sync] writeFile id:', id, 'sets:', payload.sets ? payload.sets.length : 0, 'bytes:', byteSize);
+    // Use FormData for both create and update — browser handles multipart encoding
+    // correctly on all platforms including iOS Safari. Never set Content-Type manually
+    // when using FormData; the browser must set the boundary itself.
+    const meta = JSON.stringify(id
+      ? { name: FILE_NAME }
+      : { name: FILE_NAME, parents: ['appDataFolder'] }
     );
+    const form = new FormData();
+    form.append('metadata', new Blob([meta], { type: 'application/json' }));
+    form.append('file',     new Blob([body], { type: MIME }));
+    const url = id
+      ? `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`
+      : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id';
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, {
+      method,
+      headers: { Authorization: 'Bearer ' + _token },
+      // No Content-Type header — FormData sets it with the correct boundary
+      body: form
+    });
+    if(!r.ok && r.status !== 200){
+      // Try to get error detail from response body
+      let errMsg = `writeFile HTTP ${r.status}`;
+      try { const d = await r.json(); if(d.error) errMsg = 'writeFile: ' + d.error.message; } catch(_){}
+      throw new Error(errMsg);
+    }
     const d = await r.json();
-    console.log('[QuizForge Sync] writeFile create response:', d);
-    if(d.error){ throw new Error('writeFile create: ' + d.error.message); }
+    console.log('[QuizForge Sync] writeFile response:', d.id || d.error || d);
+    if(d.error){ throw new Error('writeFile: ' + d.error.message); }
     return d;
   }
 
