@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="QuizForge">
 <meta name="theme-color" content="#0a0c12">
 <title>QuizForge</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0c12'/><text x='16' y='23' font-size='20' text-anchor='middle' font-family='sans-serif' fill='%2300e5ff'>Q</text></svg>">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230a0c12'/><text x='96' y='130' font-size='110' text-anchor='middle' font-family='sans-serif' fill='%2300e5ff'>Q</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;500;700;800&display=swap" rel="stylesheet">
@@ -1085,7 +1086,7 @@ function closeQuizOptsModal(e){
   if(activeSetId) openPreQuizModal();
 }
 
-
+function openExportModal(){
   const sets=loadSets();
   if(!sets.length) return showHomeMsg('No sets to export.',false);
   const list=document.getElementById('exportSetList');
