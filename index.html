@@ -486,12 +486,15 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
     <!-- QUIZ -->
     <div id="view-quiz" class="view">
       <div class="quiz-header">
-        <button class="btn btn-ghost btn-sm" onclick="endQuiz()">← Exit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openExitQuizModal()">← Exit</button>
         <div class="progress-bar-wrap">
           <div class="progress-label"><span id="progressLabel">Q 1 of 10</span><span id="progressPct">0%</span></div>
           <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
         </div>
-        <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
+          <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
+        </div>
       </div>
       <div class="timer-row">
         <div class="timer-box" id="overallBox"><span class="t-lbl">Total</span><span class="t-val" id="overallVal">00:00</span></div>
@@ -538,7 +541,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         </div>
         <div class="result-actions">
           <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
-          <button class="btn btn-ghost" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none;color:var(--red);border-color:rgba(255,82,82,.4)">❌ Review Incorrect</button>
+          <button class="btn btn-ghost" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none;color:var(--red);border-color:rgba(255,82,82,.4)">📖 Review</button>
           <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
           <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
         </div>
@@ -551,6 +554,20 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
   </div><!-- /innerApp -->
 </div><!-- /app -->
+
+<!-- EXIT QUIZ MODAL -->
+<div class="modal-overlay" id="exitQuizModal" style="display:none" onclick="closeExitQuizModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">Exit Quiz?</div>
+    <div id="exitQuizSummary" style="margin-bottom:18px"></div>
+    <div class="modal-footer" style="flex-direction:column;gap:10px">
+      <button class="btn btn-ghost" style="width:100%;color:var(--green);border-color:rgba(0,230,118,.4)" onclick="closeExitQuizModal();showPartialResults()">📊 Save &amp; See Results</button>
+      <button class="btn btn-danger" style="width:100%" onclick="closeExitQuizModal();endQuiz()">✕ Exit Without Saving</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="closeExitQuizModal()">↩ Keep Going</button>
+    </div>
+  </div>
+</div>
 
 <!-- PRE-QUIZ MODAL -->
 <div class="modal-overlay" id="preQuizModal" style="display:none" onclick="closePreQuizModal(event)">
@@ -753,8 +770,7 @@ function showView(name){
 // ═══════════════════════════════════════════════════
 function goHome(){
   if(document.getElementById('view-quiz').classList.contains('active')){
-    if(!confirm('Exit quiz? Progress will be lost.')) return;
-    clearInterval(overallInterval); clearInterval(qInterval);
+    openExitQuizModal(); return;
   }
   activeSetId=null; questions=[]; flaggedKeys=[];
   document.getElementById('innerApp').style.display='none';
@@ -766,7 +782,7 @@ function renderHeader(){
   const hr=document.getElementById('headerRight');
   if(activeSetId){
     const inc=loadIncorrect(activeSetId);
-    const incBtn=inc.length?`<button class="btn btn-ghost btn-sm" onclick="startIncorrectQuiz()" style="color:var(--red);border-color:rgba(255,82,82,.4)">❌ ${inc.length}</button>`:'';
+    const incBtn=inc.length?`<button class="btn btn-ghost btn-sm" onclick="startIncorrectQuiz()" style="color:var(--red);border-color:rgba(255,82,82,.4)">📖 Review (${inc.length})</button>`:'';
     hr.innerHTML=`${incBtn}<button class="btn btn-ghost btn-sm" onclick="quickQuiz(10)" style="color:var(--accent);border-color:rgba(0,229,255,.4)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
   } else { hr.innerHTML=''; }
 }
@@ -783,10 +799,6 @@ function renderSetsGrid(){
     html=sets.map(s=>{
       const qs=loadQs(s.id)||[], fl=loadFlags(s.id)||[], isActive=s.id===activeSetId;
       return `<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
-        <div class="set-card-actions">
-          <button class="icon-btn" style="font-size:.85rem;min-width:36px;min-height:36px" onclick="event.stopPropagation();startRenameCard('${s.id}')" title="Rename">✏️</button>
-          <button class="icon-btn" style="min-width:36px;min-height:36px" onclick="event.stopPropagation();deleteSet('${s.id}')" title="Delete">🗑</button>
-        </div>
         <div class="set-card-name" id="sname-${s.id}">${esc(s.name)}</div>
         <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''} · ${fl.length} flagged</div>
         ${isActive?'<span class="set-card-badge">Active</span>':''}
@@ -1175,7 +1187,7 @@ function startQuiz(){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
@@ -1203,7 +1215,8 @@ function updateQTimer(){
 function onTimeout(){
   if(answered) return; answered=true; quiz.timeouts++;
   const q=quiz.questions[quiz.idx];
-  markIncorrect(q); renderHeader();
+  markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; renderHeader();
+  document.getElementById('wrongDisplay').textContent=quiz.wrongs;
   document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
   const fb=document.getElementById('feedbackBox'); fb.style.display='block'; fb.className='feedback-box show timeout-fb';
   document.getElementById('fbTitle').textContent="⏱ Time's up!";
@@ -1219,7 +1232,7 @@ function renderQuestion(){
   document.getElementById('progressPct').textContent=pct+'%';
   document.getElementById('progressFill').style.width=pct+'%';
   document.getElementById('scoreDisplay').textContent=quiz.score;
-  document.getElementById('questionNum').textContent=`Question ${quiz.idx+1}`;
+  document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   document.getElementById('questionText').textContent=q.text;
   const fl=isFlagged(q), fb=document.getElementById('flagBtn');
   fb.textContent=fl?'🚩 Flagged':'🚩 Flag'; fb.className='btn btn-flag'+(fl?' flagged':'');
@@ -1233,7 +1246,10 @@ function renderQuestion(){
   document.getElementById('choicesList').innerHTML=q.options.map((opt,i)=>
     `<button class="choice-btn" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
   ).join('');
-  const sb=document.getElementById('submitBtn'); sb.textContent='Submit Answer'; sb.disabled=false; sb.onclick=submitAnswer;
+  const sb=document.getElementById('submitBtn');
+  sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
+  if(q.type==='multi'){ sb.disabled=true; sb.style.opacity='.45'; sb.style.cursor='not-allowed'; }
+  else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
   startQTimer();
 }
 function toggleFlag(){
@@ -1245,17 +1261,43 @@ function toggleFlag(){
 function toggleChoice(i){
   if(answered) return;
   const q=quiz.questions[quiz.idx], btn=document.getElementById('choice-'+i);
-  if(q.type==='single'){ quiz.selected=[i]; document.querySelectorAll('.choice-btn').forEach((b,j)=>b.classList.toggle('selected',j===i)); }
-  else{ const p=quiz.selected.indexOf(i); if(p>=0){quiz.selected.splice(p,1);btn.classList.remove('selected');}else{quiz.selected.push(i);btn.classList.add('selected');} }
+  if(q.type==='single'){
+    quiz.selected=[i];
+    document.querySelectorAll('.choice-btn').forEach((b,j)=>b.classList.toggle('selected',j===i));
+  } else {
+    const p=quiz.selected.indexOf(i);
+    if(p>=0){ quiz.selected.splice(p,1); btn.classList.remove('selected'); }
+    else { quiz.selected.push(i); btn.classList.add('selected'); }
+  }
+  // Update submit button state for multi questions
+  if(q.type==='multi'){
+    const sb=document.getElementById('submitBtn');
+    const needed=q.correct.length, have=quiz.selected.length;
+    const ready=have>=needed;
+    sb.disabled=!ready;
+    sb.style.opacity=ready?'':'0.45';
+    sb.style.cursor=ready?'':'not-allowed';
+    // Update hint text with live count
+    document.getElementById('selHint').textContent=ready
+      ? `${have} selected — ready!`
+      : `Choose ${needed} (${have}/${needed} selected)`;
+  }
 }
 function submitAnswer(){
-  if(!quiz.selected.length) return;
   if(answered){nextQuestion();return;}
-  clearInterval(qInterval); answered=true;
   const q=quiz.questions[quiz.idx];
+  if(!quiz.selected.length) return;
+  if(q.type==='multi' && quiz.selected.length < q.correct.length){
+    const hint=document.getElementById('selHint');
+    hint.textContent=`⚠ Select ${q.correct.length - quiz.selected.length} more answer(s)`;
+    hint.style.color='var(--orange)';
+    setTimeout(()=>{ hint.style.color=''; hint.textContent=`Choose ${q.correct.length} (${quiz.selected.length}/${q.correct.length} selected)`; }, 2000);
+    return;
+  }
+  clearInterval(qInterval); answered=true;
   const isCorrect=[...q.correct].sort().join(',')===[...quiz.selected].sort().join(',');
   if(isCorrect){ quiz.score++; markCorrect(q); }
-  else { markIncorrect(q); }
+  else { markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; }
   renderHeader();
   if(document.getElementById('settFeedback').checked){
     document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
@@ -1265,6 +1307,7 @@ function submitAnswer(){
     document.getElementById('fbExplain').textContent=(document.getElementById('settExplain').checked&&q.explain)?q.explain:'';
   }
   document.getElementById('scoreDisplay').textContent=quiz.score;
+  document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
   sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
 }
@@ -1274,7 +1317,7 @@ function quickQuiz(n){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
@@ -1289,7 +1332,7 @@ function startIncorrectQuiz(){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0,isIncorrectMode:true};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,isIncorrectMode:true};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
@@ -1311,7 +1354,7 @@ function showResults(){
   const incCount=loadIncorrect(activeSetId).length;
   const incBtn=document.getElementById('retakeIncorrectBtn');
   if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
-  if(incBtn) incBtn.textContent=`❌ Review Incorrect (${incCount})`;
+  if(incBtn) incBtn.textContent=`📖 Review (${incCount})`;
   const flagged=quiz.questions.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
@@ -1320,8 +1363,59 @@ function showResults(){
   } else sec.style.display='none';
   showView('results');
 }
+function openExitQuizModal(){
+  const answered=quiz.idx; // questions attempted so far (including current if answered)
+  const total=quiz.questions.length;
+  const remaining=total-quiz.idx-(window.answered?1:0);
+  const attempted=quiz.idx+(window.answered?1:0);
+  document.getElementById('exitQuizSummary').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:.82rem;color:var(--muted)">✅ Answered</span>
+        <span style="font-size:.82rem;font-weight:700;color:var(--green)">${attempted} of ${total}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+        <span style="font-size:.82rem;color:var(--muted)">⏭ Skipped</span>
+        <span style="font-size:.82rem;font-weight:700;color:var(--muted)">${total-attempted} not seen</span>
+      </div>
+      <p style="font-size:.76rem;color:var(--muted);padding:4px 0">Flags and incorrect tracking from answered questions will be saved.</p>
+    </div>`;
+  document.getElementById('exitQuizModal').style.display='flex';
+}
+function closeExitQuizModal(e){
+  if(e&&e.target!==document.getElementById('exitQuizModal')) return;
+  document.getElementById('exitQuizModal').style.display='none';
+}
+function showPartialResults(){
+  // Only count questions that were actually answered
+  const attempted=quiz.questions.slice(0, quiz.idx+(window.answered?1:0));
+  if(!attempted.length){ endQuiz(); return; }
+  // Temporarily override quiz to only show answered questions
+  const savedQuestions=quiz.questions;
+  quiz.questions=attempted;
+  clearInterval(overallInterval); clearInterval(qInterval);
+  const total=attempted.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
+  document.getElementById('resultScore').textContent=pct+'%';
+  document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
+  document.getElementById('resultLabel').textContent=`Partial result — ${attempted.length} of ${savedQuestions.length} questions answered`;
+  document.getElementById('rCorrect').textContent=quiz.score;
+  document.getElementById('rWrong').textContent=total-quiz.score-quiz.timeouts;
+  document.getElementById('rTimeout').textContent=quiz.timeouts;
+  document.getElementById('rTotal').textContent=total;
+  const m=Math.floor(overallSec/60), s=overallSec%60;
+  document.getElementById('rTime').textContent=`${m}m ${s}s`;
+  const incCount=loadIncorrect(activeSetId).length;
+  const incBtn=document.getElementById('retakeIncorrectBtn');
+  if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`📖 Review (${incCount})`; }
+  const flagged=attempted.filter(isFlagged);
+  const sec=document.getElementById('flaggedSection');
+  if(flagged.length){
+    sec.style.display='block';
+    document.getElementById('flaggedList').innerHTML=flagged.map(q=>`<div class="flagged-q"><div class="fq-q">${esc(q.text)}</div><div class="fq-a">✓ ${q.correct.map(i=>esc(q.options[i])).join(', ')}</div>${q.explain?`<div class="fq-e">${esc(q.explain)}</div>`:''}</div>`).join('');
+  } else sec.style.display='none';
+  showView('results');
+}
 function endQuiz(){
-  if(!confirm('Exit quiz? Progress will be lost.')) return;
   clearInterval(overallInterval); clearInterval(qInterval); showView('manage');
 }
 
