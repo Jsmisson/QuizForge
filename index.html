@@ -1167,7 +1167,7 @@ let overallSec=0, qSec=0, qMaxSec=60;
 // ═══════════════════════════════════════════════════
 function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
 function esc(s=''){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function save(){ if(activeSetId) saveQs(activeSetId,questions); }
+function save(){ if(activeSetId){ recordModified(activeSetId,'questions'); saveQs(activeSetId,questions); } }
 function saveFlg(){ if(activeSetId){ recordModified(activeSetId,'flags'); saveFlags(activeSetId,flaggedKeys); } }
 function showHomeMsg(msg,ok){ const el=document.getElementById('homeMsg'); el.style.display='block'; el.style.color=ok?'var(--green)':'var(--red)'; el.textContent=msg; }
 
@@ -3223,7 +3223,17 @@ const GDRIVE = (() => {
       const setTs = mergedClearTs[cs.id] || {};
       const cloudSyncedAt = data.synced ? new Date(data.synced).getTime() : 0;
 
-      localStorage.setItem('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+      // Only overwrite local questions if cloud is newer than last local modification
+      if(!setTs.questions || cloudSyncedAt > setTs.questions){
+        // Never overwrite the currently open set's questions — use in-memory array as source of truth
+        if(typeof activeSetId !== 'undefined' && cs.id === activeSetId){
+          console.log('[Sync] skipping question overwrite for active set:', cs.name);
+        } else {
+          localStorage.setItem('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+        }
+      } else {
+        console.log('[Sync] keeping local questions for', cs.name, '— modified after cloud sync');
+      }
 
       // Apply cloud flags only if local flags haven't been modified more recently
       if(!setTs.flags || cloudSyncedAt > setTs.flags){
