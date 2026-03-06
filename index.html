@@ -698,7 +698,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
           <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
           <button class="btn btn-ghost-red" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none">❌ Review</button>
           <button class="btn btn-ghost-red" id="viewIncorrectBtn" onclick="toggleIncorrectReview()" style="display:none">📋 View Incorrect</button>
-          <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
+          <button class="btn btn-ghost" onclick="_quizFromHome?goHome():showView('manage')">📋 Questions</button>
           <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
         </div>
         <div id="incorrectReviewSection" class="review-section" style="display:none">
@@ -1202,6 +1202,7 @@ function renderHeader(){
 
 
 function openSet(id){
+  _quizFromHome = false;
   const sets=loadSets(), set=sets.find(s=>s.id===id); if(!set) return;
   activeSetId=id; questions=loadQs(id); flaggedKeys=loadFlags(id);
   document.getElementById('view-home').classList.remove('active');
@@ -1256,12 +1257,11 @@ function renderSetsGrid(){
       </div>`;
     } else {
       const s=sets.find(x=>x.id===item.id); if(!s) return;
-      const qs=loadQs(s.id)||[], isActive=s.id===activeSetId;
+      const qs=loadQs(s.id)||[];
       const due=getSRSDueCount(s.id);
-      html+=`<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
+      html+=`<div class="set-card" onclick="openSet('${s.id}')">
         <div class="set-card-name">${esc(s.name)}</div>
         <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
-        ${isActive?'<span class="set-card-badge">Active</span>':''}
         ${due>0?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
       </div>`;
     }
@@ -1776,15 +1776,8 @@ function openPreQuizModal(){
   modalOpen('preQuizModal');
 }
 function pickSetForQuiz(id){
-  const set = loadSets().find(s => s.id === id);
-  if(!set) return;
-  activeSetId = id;
-  questions = loadQs(id);
-  flaggedKeys = loadFlags(id);
-  // Update breadcrumb name if visible
-  const bc = document.getElementById('bcSetName');
-  if(bc) bc.textContent = set.name;
-  // Re-render summary with the chosen set
+  _quizFromHome = true;
+  _activateSet(id);
   openPreQuizModal();
 }
 function closePreQuizModal(e){
@@ -1835,17 +1828,27 @@ function openQuick10Modal(withinSet){
   modalOpen('quick10Modal');
 }
 function closeQuick10Modal(){ modalClose('quick10Modal'); }
+let _quizFromHome = false;
+function _activateSet(id){
+  const sets = loadSets(), set = sets.find(s => s.id === id);
+  if(!set) return false;
+  activeSetId = id;
+  questions = loadQs(id);
+  flaggedKeys = loadFlags(id);
+  document.getElementById('view-home').classList.remove('active');
+  document.getElementById('innerApp').style.display = 'block';
+  document.getElementById('bcSetName').textContent = set.name;
+  renderHeader();
+  return true;
+}
 function startQuick10(){
   const id = _q10SelectedId || activeSetId;
   if(!id) return;
   const qs = loadQs(id);
   if(!qs.length) return;
-  if(id !== activeSetId){
-    activeSetId = id;
-    questions = qs;
-    flaggedKeys = loadFlags(id);
-  }
   closeQuick10Modal();
+  _quizFromHome = true;
+  _activateSet(id);
   const pool = [...questions].sort(()=>Math.random()-.5).slice(0,10);
   startQuizFromPool(pool);
 }
@@ -2584,7 +2587,9 @@ function showPartialResults(){
   showView('results');
 }
 function endQuiz(){
-  clearInterval(overallInterval); clearInterval(qInterval); showView('manage');
+  clearInterval(overallInterval); clearInterval(qInterval);
+  if(_quizFromHome){ _quizFromHome = false; goHome(); return; }
+  showView('manage');
 }
 
 // ═══════════════════════════════════════════════════
