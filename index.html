@@ -2880,10 +2880,10 @@ const GDRIVE = (() => {
       if(e.message && (e.message.includes('401') || e.message.includes('Invalid Credentials') || e.message.includes('invalid_token'))){
         _token = null;
         localStorage.removeItem('qforge_gdrive_token');
-        _setStatus('Session expired — please sign in again', 'err');
+        _setStatus('Session expired — sign in again', 'err');
         _renderBar();
       } else {
-        _setStatus('Sync failed: ' + e.message, 'err');
+        _setStatus('Sync unavailable', 'err');
       }
     } finally {
       _syncing = false;
