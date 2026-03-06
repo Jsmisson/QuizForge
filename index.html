@@ -2711,9 +2711,32 @@ const GDRIVE = (() => {
       callback: async (resp) => {
         if(resp.error){ console.error('GIS error', resp); return; }
         _token = resp.access_token;
+        // Store token with 55-minute expiry (tokens last 60min, give 5min buffer)
+        const expiry = Date.now() + 55 * 60 * 1000;
         localStorage.setItem('qforge_gdrive_token', _token);
+        localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
         await _fetchProfile();
         _renderBar();
+        await syncNow();
+      }
+    });
+    client.requestAccessToken();
+  }
+
+  function _silentReauth(){
+    if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID') return;
+    console.log('[Sync] attempting silent re-auth');
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPE,
+      prompt: '',
+      callback: async (resp) => {
+        if(resp.error){ console.warn('[Sync] silent re-auth failed:', resp.error); _setStatus('Session expired — sign in again', 'err'); _renderBar(); return; }
+        _token = resp.access_token;
+        const expiry = Date.now() + 55 * 60 * 1000;
+        localStorage.setItem('qforge_gdrive_token', _token);
+        localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
+        console.log('[Sync] silent re-auth success');
         await syncNow();
       }
     });
@@ -2917,12 +2940,12 @@ const GDRIVE = (() => {
       localStorage.setItem('qforge_gdrive_lastSync', Date.now());
     } catch(e){
       console.error('[QuizForge Sync] syncNow error:', e.message);
-      // Token likely expired — clear it and prompt re-sign-in
       if(e.message && (e.message.includes('401') || e.message.includes('Invalid Credentials') || e.message.includes('invalid_token'))){
         _token = null;
         localStorage.removeItem('qforge_gdrive_token');
-        _setStatus('Session expired — sign in again', 'err');
-        _renderBar();
+        localStorage.removeItem('qforge_gdrive_token_expiry');
+        _setStatus('Reconnecting…', 'busy');
+        _silentReauth();
       } else {
         _setStatus('Sync unavailable', 'err');
       }
@@ -2953,14 +2976,25 @@ const GDRIVE = (() => {
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
     const saved = localStorage.getItem('qforge_gdrive_token');
-    // Restore cached profile immediately so name shows without waiting for fetch
+    const tokenExpiry = localStorage.getItem('qforge_gdrive_token_expiry');
+    // Restore cached profile immediately
     const cachedProfile = localStorage.getItem('qforge_gdrive_profile');
     if(cachedProfile) try{ _userProfile = JSON.parse(cachedProfile); } catch(_){}
     if(saved){
+      // Check if token is expired (tokens last ~1 hour)
+      if(tokenExpiry && Date.now() > parseInt(tokenExpiry)){
+        console.log('[Sync] stored token expired, clearing');
+        _token = null;
+        localStorage.removeItem('qforge_gdrive_token');
+        localStorage.removeItem('qforge_gdrive_token_expiry');
+        _renderBar();
+        return;
+      }
       _token = saved;
-      _renderBar(); // render strip immediately with cached profile
-      await _fetchProfile(); // then refresh profile in background
-      _renderBar(); // re-render with fresh profile
+      console.log('[Sync] restored token from storage, expiry:', new Date(parseInt(tokenExpiry||0)).toLocaleTimeString());
+      _renderBar();
+      await _fetchProfile();
+      _renderBar();
       syncNow();
     } else {
       _renderBar();
