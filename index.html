@@ -467,7 +467,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.911</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.92</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -1076,14 +1076,19 @@ window.addEventListener('offline',updateOnlineStatus);
 updateOnlineStatus();
 
 // ═══════════════════════════════════════════════════
-//  IMAGE STORE  (localStorage-backed with canvas compression)
-//  Images are compressed to max 900px / JPEG 82% on upload (~60-100KB each).
-//  Stored as q.image directly in the question object — no IndexedDB needed.
-//  This gives full cross-platform compatibility including iOS PWA.
+//  IMAGE STORE  (session memory — images NEVER written to localStorage)
+//
+//  Architecture:
+//    q.imageRef = short key stored in localStorage with the question
+//    ImageStore = in-memory Map: imageRef → base64 dataURL
+//    Drive/export payload carries images:{} map for persistence
+//    On import/sync-down: ImageStore.putAll(payload.images) fills cache
+//    On upload: compressImage → ImageStore.put(dataURL) → returns ref key
+//
+//  iOS localStorage quota (~2.5MB) is never touched by image data.
 // ═══════════════════════════════════════════════════
 
-// Compress a data-URL to max 900px wide/tall, JPEG quality 0.82
-// Returns a Promise resolving to the compressed data-URL
+// Compress a data-URL to max 900px / JPEG 82% (~50-100KB result)
 function compressImage(dataURL){
   return new Promise((resolve) => {
     const MAX = 900, QUALITY = 0.82;
@@ -1099,32 +1104,42 @@ function compressImage(dataURL){
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
       resolve(canvas.toDataURL('image/jpeg', QUALITY));
     };
-    img.onerror = () => resolve(dataURL); // fallback: use original
+    img.onerror = () => resolve(dataURL);
     img.src = dataURL;
   });
 }
 
-// ImageStore shim — keeps API compatible but stores inline in question objects
-// All methods are no-ops or passthroughs since images now live in q.image directly
 const ImageStore = (() => {
-  // These are kept for backward compat with any legacy imageRef keys left in old data.
-  // On sync-down, if a question has imageRef but no image, we resolve via the Drive payload.
-  const _cache = {}; // in-memory only — for the current session
+  const _cache = new Map(); // imageRef key → dataURL
 
-  async function put(dataURL){ return null; } // not used in new flow
-  async function get(key){ return _cache[key] || null; }
-  async function del(key){ delete _cache[key]; }
-  async function getAll(keys){ 
+  // Store a new image; returns a unique ref key
+  function put(dataURL){
+    if(!dataURL) return null;
+    const key = 'img_' + Math.random().toString(36).slice(2,10) + '_' + Date.now();
+    _cache.set(key, dataURL);
+    return key;
+  }
+  function get(key){ return (key && _cache.has(key)) ? _cache.get(key) : null; }
+  function del(key){ if(key) _cache.delete(key); }
+  // Bulk load from Drive payload or import file
+  function putAll(map){
+    if(!map || typeof map !== 'object') return;
+    Object.entries(map).forEach(([k,v]) => { if(k && v) _cache.set(k, v); });
+  }
+  // Return only the requested keys (for Drive payload / export)
+  function getAll(keys){
     const out = {};
-    keys.forEach(k => { if(_cache[k]) out[k] = _cache[k]; });
+    (keys || []).forEach(k => { const v = _cache.get(k); if(v) out[k] = v; });
     return out;
   }
-  async function putAll(map){ Object.assign(_cache, map); }
-  async function pruneExcept(keepSet){
-    Object.keys(_cache).forEach(k => { if(!keepSet.has(k)) delete _cache[k]; });
+  // Remove stale keys not in the live ref set
+  function pruneExcept(keepSet){
+    _cache.forEach((_, k) => { if(!keepSet.has(k)) _cache.delete(k); });
   }
-  return { put, get, del, getAll, putAll, pruneExcept };
+  function size(){ return _cache.size; }
+  return { put, get, del, putAll, getAll, pruneExcept, size };
 })();
+
 // Helper: collect all imageRef values from a questions array
 function _collectImageRefs(questions){
   return (questions || []).map(q => q.imageRef).filter(Boolean);
@@ -1181,7 +1196,20 @@ function saveSets(s){ _lsSet('qforge_sets',JSON.stringify(s)); }
 function loadFolders(){ return JSON.parse(localStorage.getItem('qforge_folders')||'[]'); }
 function saveFolders(f){ _lsSet('qforge_folders',JSON.stringify(f)); }
 function loadQs(id){ return JSON.parse(localStorage.getItem('qforge_qs_'+id)||'[]'); }
-function saveQs(id,qs){ _lsSet('qforge_qs_'+id,JSON.stringify(qs)); }
+function saveQs(id, qs){
+  // Strip inline images before writing to localStorage — store only the ref key.
+  // Any q.image blob gets moved into ImageStore and replaced with q.imageRef.
+  const stripped = (qs || []).map(q => {
+    if(q.image && q.image.startsWith('data:')){
+      // Migrate inline image into session cache
+      const ref = q.imageRef || ImageStore.put(q.image);
+      const { image, ...rest } = q;
+      return { ...rest, imageRef: ref };
+    }
+    return q;
+  });
+  _lsSet('qforge_qs_'+id, JSON.stringify(stripped));
+}
 function loadFlags(id){ return JSON.parse(localStorage.getItem('qforge_flags_'+id)||'[]'); }
 function saveFlags(id,fl){ _lsSet('qforge_flags_'+id,JSON.stringify(fl)); }
 
@@ -1702,16 +1730,16 @@ function handleEditQImg(evt){
 function removeEditQImg(){ _setImgUI('edit',null); }
 function _resetNewQImgUI(){ _setImgUI('new',null); }
 
-// Load image into the edit UI — images are now stored inline as q.image
-function _loadImgIntoEdit(imgSrc){
-  _setImgUI('edit', imgSrc || null);
+// Load image for edit modal — resolved from session cache via imageRef
+function _loadImgIntoEdit(imageRef){
+  _setImgUI('edit', ImageStore.get(imageRef) || null);
 }
 
-// Resolve image source for rendering — always inline now, imageRef kept for legacy compat
-async function _resolveImgSrc(q){
+// Resolve image source for rendering
+function _resolveImgSrc(q){
   if(!q) return null;
-  if(q.image) return q.image;
-  if(q.imageRef) return await ImageStore.get(q.imageRef); // legacy fallback
+  if(q.imageRef) return ImageStore.get(q.imageRef);
+  if(q.image) return q.image; // legacy: inline image not yet migrated
   return null;
 }
 
@@ -1734,7 +1762,9 @@ function saveQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     q={text,type,options,correct,explain:document.getElementById('newQExplain').value.trim()};
   }
-  if(_newQImg) q.image = _newQImg;
+  if(_newQImg){
+    q.imageRef = ImageStore.put(_newQImg); // store in session cache, keep localStorage clean
+  }
   questions.push(q);
   _resetNewQImgUI();
   save(); cancelEdit();
@@ -1763,7 +1793,7 @@ function openEditModal(i){
       b.appendChild(d);
     });
   }
-  _loadImgIntoEdit(q.image || null);
+  _loadImgIntoEdit(q.imageRef || null);
   modalOpen('editModal');
 }
 function closeEditModal(e){
@@ -1809,15 +1839,20 @@ function saveEditQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     updatedQ={text,type,options,correct,explain:document.getElementById('editQExplain').value.trim()};
   }
-  // Image handling: store compressed data-URL directly in q.image
+  // Image handling — always use imageRef/session cache, never inline in localStorage
   if(_editQImg){
-    updatedQ.image = _editQImg; // new image selected
-  } else if(questions[editingIdx].image) {
-    updatedQ.image = questions[editingIdx].image; // unchanged — carry forward
+    // New image — delete old ref from cache, store new one
+    if(questions[editingIdx].imageRef) ImageStore.del(questions[editingIdx].imageRef);
+    updatedQ.imageRef = ImageStore.put(_editQImg);
+  } else if(_editQImg === null && !document.getElementById('editQImgPreview').style.display){
+    // Image was explicitly removed (preview hidden, _editQImg cleared)
+    if(questions[editingIdx].imageRef) ImageStore.del(questions[editingIdx].imageRef);
+  } else if(questions[editingIdx].imageRef){
+    updatedQ.imageRef = questions[editingIdx].imageRef; // unchanged
+  } else if(questions[editingIdx].image){
+    // Migrate legacy inline image into session cache on save
+    updatedQ.imageRef = ImageStore.put(questions[editingIdx].image);
   }
-  // Carry forward legacy imageRef if present (will be resolved via Drive on next sync)
-  if(!updatedQ.image && questions[editingIdx].imageRef)
-    updatedQ.imageRef = questions[editingIdx].imageRef;
   questions[editingIdx]=updatedQ;
   const newKey=flagKey(questions[editingIdx]);
   if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
@@ -2167,7 +2202,11 @@ function importBank(evt){
         showHomeMsg('✗ This is a full backup file — use "Restore Full Backup" instead.',false);
         evt.target.value=''; return;
       }
+      // Load any bundled images into session cache first
+      if(data.images && typeof data.images === 'object') ImageStore.putAll(data.images);
       if(data.sets&&Array.isArray(data.sets)){
+        // Load images into session cache before saveQs strips refs
+        if(data.images && typeof data.images === 'object') ImageStore.putAll(data.images);
         const existing=loadSets(), existingFolders=loadFolders();
         const folderIdMap={};
         if(data.folders&&Array.isArray(data.folders)){
@@ -2219,20 +2258,25 @@ function exportFullBackup(){
     cardFirst:document.getElementById('settCardFirst').value,
     cardsOnly:document.getElementById('settCardsOnly').checked
   };
+  // Collect all imageRefs across all sets and bundle blobs from session cache
+  const allSetsData = sets.map(s=>({
+    id:s.id, name:s.name, folderId:s.folderId||null, created:s.created,
+    questions:loadQs(s.id),
+    flaggedKeys:loadFlags(s.id),
+    incorrectTracking:loadIncorrect(s.id)
+  }));
+  const allRefs = [];
+  allSetsData.forEach(s => s.questions.forEach(q => { if(q.imageRef) allRefs.push(q.imageRef); }));
+  const images = ImageStore.getAll(allRefs);
   const payload={
-    type:'fullbackup', version:6,
+    type:'fullbackup', version:7,
     exported:new Date().toISOString(),
     settings, gridOrder, folders,
-    // images stored inline in q.image — no separate map
-    sets:sets.map(s=>({
-      id:s.id, name:s.name, folderId:s.folderId||null, created:s.created,
-      questions:loadQs(s.id),
-      flaggedKeys:loadFlags(s.id),
-      incorrectTracking:loadIncorrect(s.id)
-    }))
+    images,  // {imageRef: dataURL} — images live here, not inline in questions
+    sets: allSetsData
   };
   dlBlob(JSON.stringify(payload,null,2),`quizforge-backup-${new Date().toISOString().slice(0,10)}.json`);
-  showHomeMsg('✓ Full backup exported (images included).',true);
+  showHomeMsg(`✓ Full backup exported (${allRefs.length} image(s) included).`,true);
 }
 function importFullBackup(evt){
   const file=evt.target.files[0]; if(!file) return;
@@ -2242,6 +2286,10 @@ function importFullBackup(evt){
       const data=JSON.parse(e.target.result);
       if(data.type!=='fullbackup') throw new Error('Not a full backup file. Use Import Set(s) instead.');
       if(!confirm('This will REPLACE all your current data with the backup. Are you sure?')){ evt.target.value=''; return; }
+      // Load images from payload into session cache FIRST — before saveQs strips refs
+      if(data.images && typeof data.images === 'object') ImageStore.putAll(data.images);
+      // Also handle legacy v5 format where images were inline in q.image
+      // (saveQs will auto-migrate those into ImageStore)
       // Clear everything
       const oldSets=loadSets();
       oldSets.forEach(s=>{ localStorage.removeItem('qforge_qs_'+s.id); localStorage.removeItem('qforge_flags_'+s.id); localStorage.removeItem('qforge_incorrect_'+s.id); });
@@ -2280,7 +2328,11 @@ function importFullBackup(evt){
 }
 function dlBlob(content,filename){
   const blob=new Blob([content],{type:'application/json'}), url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+  const a=document.createElement('a'); a.href=url; a.download=filename;
+  // iOS Safari requires the element to be in the DOM before .click() works
+  a.style.display='none'; document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
 }
 
 // ═══════════════════════════════════════════════════
@@ -3303,17 +3355,24 @@ const GDRIVE = (() => {
     const clearTs = loadClearTimestamps();
     console.log('[Sync] building payload — sets:', sets.length, 'tombstones:', tombstones);
 
+    // Collect all live imageRef keys and fetch from session cache
+    const allSets = sets.map(s => ({ ...s, questions: loadQs(s.id) }));
+    const allRefs = [];
+    allSets.forEach(s => s.questions.forEach(q => { if(q.imageRef) allRefs.push(q.imageRef); }));
+    const images = ImageStore.getAll(allRefs);
+    console.log('[Sync] payload images:', Object.keys(images).length, 'refs:', allRefs.length);
+
     return {
-      type: 'fullbackup', version: 6,
+      type: 'fullbackup', version: 7,
       synced: new Date().toISOString(),
       tombstones,
       clearTimestamps: clearTs,
       gridOrder: loadGridOrder(),
       folders,
-      // images are stored inline in q.image — no separate map needed
-      sets: sets.map(s => ({
+      images, // {imageRef: dataURL} — kept out of localStorage, travels via Drive
+      sets: allSets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
-        questions:          loadQs(s.id),
+        questions:          s.questions,
         flaggedKeys:        loadFlags(s.id),
         incorrectTracking:  loadIncorrect(s.id),
         srsData:            loadSRS(s.id)
@@ -3325,9 +3384,11 @@ const GDRIVE = (() => {
   async function _applyPayload(data){
     if(!data || !Array.isArray(data.sets)) return;
 
-    // Note: images are stored inline in q.image — no separate restore step needed.
-    // Legacy v5 payloads with a separate images:{} map are handled by _collectImageRefs
-    // being a no-op when questions already have q.image populated.
+    // Load images from payload into session cache — keeps localStorage clean
+    if(data.images && typeof data.images === 'object'){
+      ImageStore.putAll(data.images);
+      console.log('[Sync] loaded', Object.keys(data.images).length, 'images into session cache');
+    }
 
     // Merge tombstones — union of local + cloud deletions
     const localTombstones  = loadTombstones();
