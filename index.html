@@ -1032,6 +1032,42 @@ function migrateLegacy(){
   localStorage.removeItem('qforge_qs'); localStorage.removeItem('qforge_flags');
 }
 
+function getSavedWrongs(){
+  return Object.entries(quiz.savedAnswers||{})
+    .filter(([,a])=>!a.isCorrect)
+    .map(([i,a])=>({q:quiz.questions[+i],selected:a.selected||[],isCorrect:false,isCard:a.cardResult!==undefined}))
+    .filter(e=>e.q);
+}
+function renderResultButtons(savedWrongs){
+  const incCount=loadIncorrect(activeSetId).length;
+  const incBtn=document.getElementById('retakeIncorrectBtn');
+  if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`❌ Review (${incCount})`; }
+  const viewBtn=document.getElementById('viewIncorrectBtn');
+  if(viewBtn){ viewBtn.style.display=savedWrongs.length?'inline-flex':'none'; viewBtn.textContent=`📋 View Incorrect (${savedWrongs.length})`; }
+  const revSec=document.getElementById('incorrectReviewSection');
+  if(revSec) revSec.style.display='none';
+  const revList=document.getElementById('incorrectReviewList');
+  if(revList) revList.innerHTML='';
+}
+function formatTime(sec){ const m=Math.floor(sec/60), s=sec%60; return `${m}m ${s}s`; }
+function shufflePool(pool){
+  if(document.getElementById('settShuffleOpts').checked){
+    pool=pool.map(q=>{
+      if(q.type==='card') return q;
+      const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)}));
+      p.sort(()=>Math.random()-.5);
+      return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)};
+    });
+  }
+  return pool;
+}
+function startQuizFromPool(pool, extra={}){
+  pool=shufflePool(pool);
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,answerLog:[],savedAnswers:{},...extra};
+  answered=false; overallSec=0; clearInterval(overallInterval);
+  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
+  showView('quiz'); renderQuestion();
+}
 // ═══════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════
@@ -1295,7 +1331,7 @@ function renameCurrentSet(){
 // ═══════════════════════════════════════════════════
 //  FLAGS
 // ═══════════════════════════════════════════════════
-function flagKey(q){ return q.type==='card'?('card:'+q.term.trim()):q.text.trim(); }
+function flagKey(q){ return incorrectKey(q); }
 function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
 function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
 function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); renderQList(); }
@@ -1398,60 +1434,29 @@ function cancelEdit(){
 }
 let _newQImg=null, _editQImg=null;
 
+function _setImgUI(prefix, src){
+  const ref = prefix==='new' ? '_newQImg' : '_editQImg';
+  window[ref]=src||null;
+  document.getElementById(prefix+'QImgThumb').src=src||'';
+  document.getElementById(prefix+'QImgPreview').style.display=src?'block':'none';
+  document.getElementById(prefix+'QImgUploadArea').style.display=src?'none':'';
+}
 function handleNewQImg(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    _newQImg=e.target.result;
-    document.getElementById('newQImgThumb').src=_newQImg;
-    document.getElementById('newQImgPreview').style.display='block';
-    document.getElementById('newQImgUploadArea').style.display='none';
-  };
-  reader.readAsDataURL(file);
-  evt.target.value='';
+  reader.onload=e=>{ _newQImg=e.target.result; _setImgUI('new',_newQImg); };
+  reader.readAsDataURL(file); evt.target.value='';
 }
-function removeNewQImg(){
-  _newQImg=null;
-  document.getElementById('newQImgThumb').src='';
-  document.getElementById('newQImgPreview').style.display='none';
-  document.getElementById('newQImgUploadArea').style.display='';
-}
+function removeNewQImg(){ _setImgUI('new',null); }
 function handleEditQImg(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
-    _editQImg=e.target.result;
-    document.getElementById('editQImgThumb').src=_editQImg;
-    document.getElementById('editQImgPreview').style.display='block';
-    document.getElementById('editQImgUploadArea').style.display='none';
-  };
-  reader.readAsDataURL(file);
-  evt.target.value='';
+  reader.onload=e=>{ _editQImg=e.target.result; _setImgUI('edit',_editQImg); };
+  reader.readAsDataURL(file); evt.target.value='';
 }
-function removeEditQImg(){
-  _editQImg=null;
-  document.getElementById('editQImgThumb').src='';
-  document.getElementById('editQImgPreview').style.display='none';
-  document.getElementById('editQImgUploadArea').style.display='';
-}
-function _resetNewQImgUI(){
-  _newQImg=null;
-  document.getElementById('newQImgThumb').src='';
-  document.getElementById('newQImgPreview').style.display='none';
-  document.getElementById('newQImgUploadArea').style.display='';
-}
-function _loadImgIntoEdit(img){
-  _editQImg=img||null;
-  if(img){
-    document.getElementById('editQImgThumb').src=img;
-    document.getElementById('editQImgPreview').style.display='block';
-    document.getElementById('editQImgUploadArea').style.display='none';
-  } else {
-    document.getElementById('editQImgThumb').src='';
-    document.getElementById('editQImgPreview').style.display='none';
-    document.getElementById('editQImgUploadArea').style.display='';
-  }
-}
+function removeEditQImg(){ _setImgUI('edit',null); }
+function _resetNewQImgUI(){ _setImgUI('new',null); }
+function _loadImgIntoEdit(img){ _setImgUI('edit',img||null); }
 function saveQuestion(){
   const type=document.getElementById('newQType').value;
   let q;
@@ -1923,16 +1928,9 @@ function startQuiz(){
   if(document.getElementById('settCardsOnly').checked) pool=pool.filter(q=>q.type==='card');
   if(!pool.length) return alert('No questions to quiz!');
   if(document.getElementById('settShuffle').checked) pool.sort(()=>Math.random()-.5);
-  // Apply question limit — always shuffle first so limit picks a random subset
   const limit=parseInt(document.getElementById('settQLimit').value)||0;
-  if(limit>0 && limit<pool.length) pool=pool.slice(0,limit);
-  if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
-  }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,answerLog:[],savedAnswers:{}};
-  answered=false; overallSec=0; clearInterval(overallInterval);
-  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
-  showView('quiz'); renderQuestion();
+  if(limit>0&&limit<pool.length) pool=pool.slice(0,limit);
+  startQuizFromPool(pool);
 }
 function updateOverallTimer(){
   const m=Math.floor(overallSec/60).toString().padStart(2,'0'), s=(overallSec%60).toString().padStart(2,'0');
@@ -1957,6 +1955,8 @@ function updateQTimer(){
 function onTimeout(){
   if(answered) return; answered=true; quiz.timeouts++;
   const q=quiz.questions[quiz.idx];
+  if(!quiz.savedAnswers) quiz.savedAnswers={};
+  quiz.savedAnswers[quiz.idx]={selected:[],isCorrect:false};
   markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; renderHeader();
   document.getElementById('wrongDisplay').textContent=quiz.wrongs;
   document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
@@ -2245,14 +2245,8 @@ function submitAnswer(){
 }
 function quickQuiz(n){
   if(!questions.length) return alert('No questions in this set.');
-  let pool=[...questions].sort(()=>Math.random()-.5).slice(0,n);
-  if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
-  }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,answerLog:[],savedAnswers:{}};
-  answered=false; overallSec=0; clearInterval(overallInterval);
-  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
-  showView('quiz'); renderQuestion();
+  const pool=[...questions].sort(()=>Math.random()-.5).slice(0,n);
+  startQuizFromPool(pool);
 }
 function startIncorrectQuiz(){
   const inc=loadIncorrect(activeSetId);
@@ -2261,13 +2255,7 @@ function startIncorrectQuiz(){
   let pool=questions.filter(q=>incKeys.has(incorrectKey(q)));
   if(!pool.length) return alert('Incorrect questions not found in this set.');
   pool.sort(()=>Math.random()-.5);
-  if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
-  }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,isIncorrectMode:true,answerLog:[],savedAnswers:{}};
-  answered=false; overallSec=0; clearInterval(overallInterval);
-  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
-  showView('quiz'); renderQuestion();
+  startQuizFromPool(pool,{isIncorrectMode:true});
 }
 function nextQuestion(){ quiz.idx++; if(quiz.idx>=quiz.questions.length){showResults();return;} renderQuestion(); }
 function prevQuestion(){ if(quiz.idx<=0) return; quiz.idx--; renderQuestion(); }
@@ -2285,27 +2273,8 @@ function showResults(){
   document.getElementById('rWrong').textContent=total-quiz.score-quiz.timeouts;
   document.getElementById('rTimeout').textContent=quiz.timeouts;
   document.getElementById('rTotal').textContent=total;
-  const m=Math.floor(overallSec/60), s=overallSec%60;
-  document.getElementById('rTime').textContent=`${m}m ${s}s`;
-  // Show Review Incorrect button if there are any
-  const incCount=loadIncorrect(activeSetId).length;
-  const incBtn=document.getElementById('retakeIncorrectBtn');
-  if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
-  if(incBtn) incBtn.textContent=`❌ Review (${incCount})`;
-  // Show View Incorrect button — build directly from savedAnswers (always reliable)
-  const savedWrongs=Object.entries(quiz.savedAnswers||{})
-    .filter(([,a])=>!a.isCorrect)
-    .map(([i,a])=>({q:quiz.questions[+i], selected:a.selected||[], isCorrect:false, isCard:a.cardResult!==undefined}))
-    .filter(e=>e.q);
-  const viewBtn=document.getElementById('viewIncorrectBtn');
-  if(viewBtn){
-    viewBtn.style.display=savedWrongs.length?'inline-flex':'none';
-    viewBtn.textContent=`📋 View Incorrect (${savedWrongs.length})`;
-  }  // Reset review panel
-  const revSec=document.getElementById('incorrectReviewSection');
-  if(revSec) revSec.style.display='none';
-  const revList=document.getElementById('incorrectReviewList');
-  if(revList) revList.innerHTML='';
+  document.getElementById('rTime').textContent=formatTime(overallSec);
+  renderResultButtons(getSavedWrongs());
   const flagged=quiz.questions.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
@@ -2328,10 +2297,7 @@ function toggleIncorrectReview(){
   }
 }
 function renderIncorrectReview(){
-  const wrongLog=Object.entries(quiz.savedAnswers||{})
-    .filter(([,a])=>!a.isCorrect)
-    .map(([i,a])=>({q:quiz.questions[+i], selected:a.selected||[], isCorrect:false, isCard:a.cardResult!==undefined}))
-    .filter(e=>e.q);
+  const wrongLog=getSavedWrongs();
   const list=document.getElementById('incorrectReviewList');
   if(!list) return;
   list.innerHTML=wrongLog.map((entry,ei)=>{
@@ -2391,30 +2357,19 @@ function showPartialResults(){
   const savedQuestions=quiz.questions;
   quiz.questions=attempted;
   clearInterval(overallInterval); clearInterval(qInterval);
-  const total=attempted.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
+  // Score/wrongs from savedAnswers only — quiz.score may include future answers
+  const answeredEntries=Object.entries(quiz.savedAnswers||{}).filter(([i])=>+i<attempted.length);
+  const score=answeredEntries.filter(([,a])=>a.isCorrect).length;
+  const total=attempted.length, pct=total?Math.round((score/total)*100):0, pass=pct>=70;
   document.getElementById('resultScore').textContent=pct+'%';
   document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
   document.getElementById('resultLabel').textContent=`Partial result — ${attempted.length} of ${savedQuestions.length} questions answered`;
-  document.getElementById('rCorrect').textContent=quiz.score;
-  document.getElementById('rWrong').textContent=total-quiz.score-quiz.timeouts;
+  document.getElementById('rCorrect').textContent=score;
+  document.getElementById('rWrong').textContent=Math.max(0,total-score-quiz.timeouts);
   document.getElementById('rTimeout').textContent=quiz.timeouts;
   document.getElementById('rTotal').textContent=total;
-  const m=Math.floor(overallSec/60), s=overallSec%60;
-  document.getElementById('rTime').textContent=`${m}m ${s}s`;
-  const incCount=loadIncorrect(activeSetId).length;
-  const incBtn=document.getElementById('retakeIncorrectBtn');
-  if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`❌ Review (${incCount})`; }
-  // View Incorrect button
-  const savedWrongs=Object.entries(quiz.savedAnswers||{})
-    .filter(([,a])=>!a.isCorrect)
-    .map(([i,a])=>({q:quiz.questions[+i],selected:a.selected||[],isCorrect:false,isCard:a.cardResult!==undefined}))
-    .filter(e=>e.q);
-  const viewBtn=document.getElementById('viewIncorrectBtn');
-  if(viewBtn){ viewBtn.style.display=savedWrongs.length?'inline-flex':'none'; viewBtn.textContent=`📋 View Incorrect (${savedWrongs.length})`; }
-  const revSec=document.getElementById('incorrectReviewSection');
-  if(revSec) revSec.style.display='none';
-  const revList=document.getElementById('incorrectReviewList');
-  if(revList) revList.innerHTML='';
+  document.getElementById('rTime').textContent=formatTime(overallSec);
+  renderResultButtons(getSavedWrongs());
   const flagged=attempted.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
