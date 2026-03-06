@@ -478,14 +478,16 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   <!-- ═══ SETS HOME ═══ -->
   <div id="view-home" class="view active">
     <div class="sets-header">
-      <div class="sets-header-text">
-        <h2>Your Question Sets</h2>
-        <p>Each set has its own questions and flags.</p>
-      </div>
+      <h2>Your Question Sets</h2>
       <div class="sets-header-actions">
-        <button class="btn btn-primary btn-sm" onclick="openQuizOptsModal()">⚙️ Quiz Options</button>
-        <button class="btn btn-ghost btn-sm" onclick="openOrganizeModal()">⠿ Organize</button>
-        <button class="btn btn-ghost btn-sm" onclick="openImportExportModal()">⇅ Import / Export</button>
+        <div style="position:relative;display:inline-block">
+          <button class="btn btn-ghost btn-sm" onclick="toggleHomeMenu(event)">⚙ Menu</button>
+          <div id="homeMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:170px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+            <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openOrganizeModal()">⠿ Organize</button>
+            <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openBackupModal()">📦 Backup</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openQuizOptsModal()">▶ Quiz</button>
       </div>
     </div>
     <div id="homeMsg" class="notice" style="display:none;margin-bottom:12px"></div>
@@ -522,7 +524,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       </div>
     </div>
 
-    <!-- ADD -->\
+    <!-- ADD -->
     <div id="view-add" class="view">
       <div class="card">
         <div class="card-title">Add New Question</div>
@@ -597,7 +599,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <div class="card">
         <div class="card-title" style="margin-bottom:6px">Quiz Options</div>
         <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Quiz settings are now managed globally from the Sets screen.</p>
-        <button class="btn btn-ghost" style="width:100%" onclick="goHome();setTimeout(openQuizOptsModal,200)">⚙️ Open Quiz Options</button>
+        <button class="btn btn-ghost" style="width:100%" onclick="openPreQuizModal()">▶ Start Quiz / Options</button>
       </div>
       <div class="card">
         <div class="card-title">This Set</div>
@@ -780,72 +782,73 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   </div>
 </div>
 
-<!-- PRE-QUIZ MODAL -->
+<!-- PRE-QUIZ / OPTIONS MODAL (unified) -->
 <div class="modal-overlay" id="preQuizModal" style="display:none" onclick="closePreQuizModal(event)">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">▶ Start Quiz</div>
 
-    <!-- Settings summary -->
-    <div id="preQuizSummary" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
+    <!-- Question count summary -->
+    <div id="preQuizSummary" style="margin-bottom:16px"></div>
 
-    <div class="modal-footer" style="flex-direction:column;gap:10px">
-      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:.95rem" onclick="closePreQuizModal();startQuiz()">▶ Start Now</button>
-      <button class="btn btn-ghost" style="width:100%" onclick="closePreQuizModal();openQuizOptsModal()">⚙️ Edit Options</button>
-    </div>
-  </div>
-</div>
+    <!-- Core options always visible -->
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">0 = all questions</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+    <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Flagged Only</div><div class="s-desc">Restrict to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly" onchange="openPreQuizModal()"><span class="toggle-slider"></span></label></div>
 
-<!-- QUIZ OPTIONS MODAL -->
-<div class="modal-overlay" id="quizOptsModal" style="display:none" onclick="closeQuizOptsModal(event)">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:500px">
-    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
-    <div class="modal-title">⚙️ Quiz Options</div>
-
-    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Behaviour</div>
-    <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div><div class="s-desc">Randomize order each quiz</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div><div class="s-desc">Randomize option order</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">Max questions per quiz (0 = all)</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
-    <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
-
-    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Flashcards</div>
-    <div class="settings-row"><div><div class="s-lbl">Cards Only</div><div class="s-desc">Quiz flashcards only, skip MC questions</div></div><label class="toggle"><input type="checkbox" id="settCardsOnly"><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Show First Side</div><div class="s-desc">Which side shows first for flashcards</div></div>
-      <select id="settCardFirst" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:8px 10px;outline:none;min-height:var(--tap)">
-        <option value="term">Term</option>
-        <option value="definition">Definition</option>
-      </select>
+    <!-- Advanced expander -->
+    <button onclick="toggleAdvancedOpts()" style="background:none;border:none;color:var(--muted);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;padding:10px 0 6px;display:flex;align-items:center;gap:6px;width:100%">
+      <span id="advOptsCaret">▶</span> Advanced
+    </button>
+    <div id="advancedOpts" style="display:none">
+      <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Cards Only</div><div class="s-desc">Skip MC questions</div></div><label class="toggle"><input type="checkbox" id="settCardsOnly"><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Show First Side</div></div>
+        <select id="settCardFirst" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:8px 10px;outline:none;min-height:var(--tap)">
+          <option value="term">Term</option>
+          <option value="definition">Definition</option>
+        </select>
+      </div>
+      <div class="settings-row"><div><div class="s-lbl">📅 Due Today Only</div><div class="s-desc">SM-2 spaced repetition</div></div><label class="toggle"><input type="checkbox" id="settSRSOnly"><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Timer per Question (s)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+      <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
     </div>
 
-    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Spaced Repetition</div>
-    <div class="settings-row"><div><div class="s-lbl">📅 Due Today Only</div><div class="s-desc">SM-2 spaced repetition — only show cards due for review</div></div><label class="toggle"><input type="checkbox" id="settSRSOnly"><span class="toggle-slider"></span></label></div>
-
-    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Timers</div>
-    <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
-    <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div><div class="s-desc">Move to next question automatically</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
-
-    <div class="modal-footer">
-      <button class="btn btn-primary" onclick="closeQuizOptsModal()">Done</button>
+    <div class="modal-footer" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closePreQuizModal()">Cancel</button>
+      <button class="btn btn-primary" style="padding:12px 28px;font-size:.95rem" onclick="closePreQuizModal();startQuiz()">▶ Start</button>
     </div>
   </div>
 </div>
 
 <!-- IMPORT/EXPORT MODAL -->
 <div class="modal-overlay" id="importExportModal" style="display:none" onclick="closeImportExportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">☁ Google Drive Sync</div>
+    <div id="syncBarWrap" style="margin-bottom:8px"></div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.75rem;color:var(--muted)">Backup &amp; restore your data</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeImportExportModal();openBackupModal()">📦 Backup / Restore</button>
+    </div>
+  </div>
+</div>
+
+<!-- BACKUP MODAL -->
+<div class="modal-overlay" id="backupModal" style="display:none" onclick="if(event.target===this)closeBackupModal()">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
-    <div class="modal-title">⇅ Import / Export</div>
+    <div class="modal-title">📦 Backup &amp; Restore</div>
 
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">☁ Google Drive Sync</div>
-    <div id="syncBarWrap" style="margin-bottom:18px"></div>
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Export</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
-      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeImportExportModal();openExportModal()">
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeBackupModal();openExportModal()">
         <div style="font-weight:700;margin-bottom:2px">📋 Export Set(s)</div>
         <div style="font-size:.75rem;color:var(--muted)">Questions only — share with others or back up specific sets</div>
       </button>
-      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeImportExportModal();exportFullBackup()">
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeBackupModal();exportFullBackup()">
         <div style="font-weight:700;margin-bottom:2px">💾 Full Backup</div>
         <div style="font-size:.75rem;color:var(--muted)">Everything — sets, folders, flags, incorrect tracking, order &amp; settings</div>
       </button>
@@ -856,12 +859,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
         <div style="font-weight:700;margin-bottom:2px">📋 Import Set(s)</div>
         <div style="font-size:.75rem;color:var(--muted)">Add sets from a .json export file</div>
-        <input type="file" id="importBankFile" name="importBankFile" accept=".json" style="display:none" onchange="closeImportExportModal();importBank(event)">
+        <input type="file" id="importBankFile" name="importBankFile" accept=".json" style="display:none" onchange="closeBackupModal();importBank(event)">
       </label>
       <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
         <div style="font-weight:700;margin-bottom:2px">💾 Restore Full Backup</div>
-        <div style="font-size:.75rem;color:var(--muted);color:var(--red)">⚠ Replaces ALL current data</div>
-        <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" onchange="closeImportExportModal();importFullBackup(event)">
+        <div style="font-size:.75rem;color:var(--red)">⚠ Replaces ALL current data</div>
+        <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" onchange="closeBackupModal();importFullBackup(event)">
       </label>
     </div>
   </div>
@@ -1710,35 +1713,17 @@ function exportCurrentSet(){
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
 function openPreQuizModal(){
-  // Build a summary of current quiz settings
-  const shuffle=document.getElementById('settShuffle').checked;
-  const shuffleOpts=document.getElementById('settShuffleOpts').checked;
-  const limit=parseInt(document.getElementById('settQLimit').value)||0;
-  const feedback=document.getElementById('settFeedback').checked;
-  const explain=document.getElementById('settExplain').checked;
-  const flaggedOnly=document.getElementById('settFlaggedOnly').checked;
-  const timer=parseInt(document.getElementById('settQTimer').value)||0;
-  const autoAdv=document.getElementById('settAutoAdvance').checked;
-
-  // Count available questions
-  let pool=questions;
-  if(flaggedOnly) pool=pool.filter(isFlagged);
-  const available=pool.length;
-  const willAsk=limit>0&&limit<available?limit:available;
-
-  const row=(icon,label,val,highlight)=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-      <span style="font-size:.82rem;color:var(--muted)">${icon} ${label}</span>
-      <span style="font-size:.82rem;font-weight:700;color:${highlight||'var(--text)'}">${val}</span>
-    </div>`;
-
-  document.getElementById('preQuizSummary').innerHTML=
-    row('📝','Questions',`${willAsk}${willAsk<available?' of '+available:''}${flaggedOnly?' (flagged only)':''}`, willAsk===0?'var(--red)':'var(--accent)')+
-    row('🔀','Shuffle',shuffle?'On':'Off', shuffle?'var(--green)':'var(--muted)')+
-    row('⚡','Feedback',feedback?'Instant':'Off', feedback?'var(--green)':'var(--muted)')+
-    row('⏱','Timer per Q',timer?timer+'s':'Off', timer?'var(--orange)':'var(--muted)')+
-    (timer?row('⏭','Auto-advance',autoAdv?'On':'Off'):'');
-
+  const flaggedOnly = document.getElementById('settFlaggedOnly').checked;
+  const limit = parseInt(document.getElementById('settQLimit').value)||0;
+  let pool = questions;
+  if(flaggedOnly) pool = pool.filter(isFlagged);
+  const available = pool.length;
+  const willAsk = limit > 0 && limit < available ? limit : available;
+  const color = willAsk === 0 ? 'var(--red)' : 'var(--accent)';
+  const label = willAsk === 0 ? 'No questions available' :
+    `${willAsk}${willAsk < available ? ' of ' + available : ''} question${willAsk !== 1 ? 's' : ''}${flaggedOnly ? ' · flagged only' : ''}`;
+  document.getElementById('preQuizSummary').innerHTML =
+    `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:${color}">${label}</div>`;
   modalOpen('preQuizModal');
 }
 function closePreQuizModal(e){
@@ -1753,6 +1738,8 @@ function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
   modalClose('importExportModal');
 }
+function openBackupModal(){ modalOpen('backupModal'); }
+function closeBackupModal(){ modalClose('backupModal'); }
 function openOrganizeModal(){
   renderOrganizeList();
   modalOpen('organizeModal');
@@ -1819,14 +1806,26 @@ function saveOrganize(){
   modalClose('organizeModal');
   renderSetsGrid();
 }
-function openQuizOptsModal(){
-  modalOpen('quizOptsModal');
+function openQuizOptsModal(){ openPreQuizModal(); }
+function closeQuizOptsModal(e){ closePreQuizModal(e); }
+function toggleAdvancedOpts(){
+  const el = document.getElementById('advancedOpts');
+  const caret = document.getElementById('advOptsCaret');
+  const open = el.style.display === 'none';
+  el.style.display = open ? '' : 'none';
+  caret.textContent = open ? '▼' : '▶';
 }
-function closeQuizOptsModal(e){
-  if(e&&e.target!==document.getElementById('quizOptsModal')) return;
-  modalClose('quizOptsModal');
-  // If we're inside a set, refresh the pre-quiz modal summary
-  if(activeSetId) openPreQuizModal();
+function toggleHomeMenu(e){
+  e.stopPropagation();
+  const m = document.getElementById('homeMenu');
+  m.style.display = m.style.display === 'none' ? '' : 'none';
+  if(m.style.display !== 'none'){
+    setTimeout(()=>document.addEventListener('click', closeHomeMenu, {once:true}), 0);
+  }
+}
+function closeHomeMenu(){
+  const m = document.getElementById('homeMenu');
+  if(m) m.style.display = 'none';
 }
 
 function openExportModal(){
