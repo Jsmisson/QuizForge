@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.95</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.96</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -2422,6 +2422,7 @@ function renderQuestion(){
   const saved=(quiz.savedAnswers||{})[quiz.idx];
   if(saved && freeNav){
     if(saved.selected) quiz.selected=[...saved.selected];
+    answered = true; // mark as already answered so submit btn shows Next, not Submit
   }
   document.getElementById('progressLabel').textContent=`Q ${quiz.idx+1} of ${total}`;
   document.getElementById('progressPct').textContent=pct+'%';
@@ -2515,19 +2516,31 @@ function renderQuestion(){
       `<button class="choice-btn${quiz.selected.includes(i)?' selected':''}" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
     ).join('');
     const sb=document.getElementById('submitBtn');
-    sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
-    if(freeNav && quiz.idx>0){
-      const backBtn=document.createElement('button');
-      backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
-      backBtn.style.cssText='flex:1;max-width:120px';
-      backBtn.onclick=prevQuestion;
-      footer.insertBefore(backBtn, sb);
+    // If already answered (e.g. navigating back with freeNav), show result state
+    if(answered && saved){
+      document.querySelectorAll('.choice-btn').forEach((btn,i)=>{
+        btn.disabled=true;
+        if(q.correct.includes(i)) btn.classList.add('correct');
+        else if(quiz.selected.includes(i)) btn.classList.add('wrong');
+      });
+      const isLast=quiz.idx>=quiz.questions.length-1;
+      sb.style.display=''; sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
+      sb.disabled=false; sb.style.opacity=''; sb.style.cursor='';
+    } else {
+      sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
+      if(freeNav && quiz.idx>0){
+        const backBtn=document.createElement('button');
+        backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
+        backBtn.style.cssText='flex:1;max-width:120px';
+        backBtn.onclick=prevQuestion;
+        footer.insertBefore(backBtn, sb);
+      }
+      if(q.type==='multi'){
+        const needed=q.correct.length, have=quiz.selected.length, ready=have>=needed;
+        sb.disabled=!ready; sb.style.opacity=ready?'':'0.45'; sb.style.cursor=ready?'':'not-allowed';
+        document.getElementById('selHint').textContent=ready?`${have} selected — ready!`:`Choose ${needed} (${have}/${needed} selected)`;
+      } else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
     }
-    if(q.type==='multi'){
-      const needed=q.correct.length, have=quiz.selected.length, ready=have>=needed;
-      sb.disabled=!ready; sb.style.opacity=ready?'':'0.45'; sb.style.cursor=ready?'':'not-allowed';
-      document.getElementById('selHint').textContent=ready?`${have} selected — ready!`:`Choose ${needed} (${have}/${needed} selected)`;
-    } else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
     updateHotkeyLegend(false);
   }
   startQTimer();
@@ -3443,6 +3456,15 @@ const GDRIVE = (() => {
       });
     });
     saveClearTimestamps(mergedClearTs);
+
+    // Remove clearTimestamps entries for tombstoned sets — otherwise a set deleted
+    // on one device can appear "locally modified" on another and get resurrected
+    if(deletedIds.size > 0){
+      const cleanedClearTs = JSON.parse(JSON.stringify(mergedClearTs));
+      deletedIds.forEach(id => { delete cleanedClearTs[id]; });
+      saveClearTimestamps(cleanedClearTs);
+    }
+
     const localSets = loadSets();
     console.log('[Sync] localSets before purge:', localSets.map(s=>s.id+':'+s.name));
     localSets.forEach(s => {
@@ -3618,6 +3640,9 @@ const GDRIVE = (() => {
   window.saveFolders = function(f){ _origSaveFolders(f); scheduleSync(); };
   const _origSaveIncorrect = window.saveIncorrect;
   window.saveIncorrect = function(id, arr){ _origSaveIncorrect(id, arr); scheduleSync(); };
+  // Tombstones must also trigger sync — deleteSet calls saveTombstones before saveSets
+  const _origSaveTombstones = window.saveTombstones;
+  window.saveTombstones = function(t){ _origSaveTombstones(t); scheduleSync(); };
 
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
