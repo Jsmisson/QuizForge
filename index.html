@@ -776,13 +776,13 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 
 <!-- EXIT QUIZ MODAL -->
 <div class="modal-overlay" id="exitQuizModal" style="display:none" onclick="closeExitQuizModal(event)">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;animation:none">
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
-      <button class="btn btn-ghost-green" style="width:100%" onclick="document.getElementById('exitQuizModal').style.display='none';document.body.classList.remove('modal-open');document.body.style.top='';showPartialResults()">📊 Save &amp; See Results</button>
-      <button class="btn btn-danger" style="width:100%" onclick="document.getElementById('exitQuizModal').style.display='none';document.body.classList.remove('modal-open');document.body.style.top='';endQuiz()">✕ Exit Without Results</button>
+      <button class="btn btn-ghost-green" style="width:100%" onclick="modalClose('exitQuizModal');showPartialResults()">📊 Save &amp; See Results</button>
+      <button class="btn btn-danger" style="width:100%" onclick="modalClose('exitQuizModal');endQuiz()">✕ Exit Without Results</button>
       <button class="btn btn-ghost" style="width:100%" onclick="modalClose('exitQuizModal')">↩ Keep Going</button>
     </div>
   </div>
@@ -969,10 +969,13 @@ let _scrollY=0;
 function modalOpen(id){
   const el=document.getElementById(id); if(!el) return;
   _scrollY=window.scrollY;
-  document.body.classList.add('modal-open');
-  document.body.style.top=`-${_scrollY}px`;
+  // Don't apply position:fixed scroll lock for exit quiz modal — quiz view doesn't scroll
+  // and removing it causes iOS viewport jump that swallows the next tap
+  if(id !== 'exitQuizModal'){
+    document.body.classList.add('modal-open');
+    document.body.style.top=`-${_scrollY}px`;
+  }
   el.style.display='flex';
-  // Attach swipe-to-dismiss on the inner .modal element (mobile only)
   const modal=el.querySelector('.modal');
   if(modal && window.innerWidth<600) _attachSwipe(modal, ()=>modalClose(id));
 }
