@@ -190,14 +190,15 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
 /* ══ EDIT MODAL ══ */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
-  display:flex;align-items:flex-end;justify-content:center;padding:0}
+  display:flex;align-items:flex-end;justify-content:center;padding:0;touch-action:none}
 @media(min-width:600px){.modal-overlay{align-items:center;padding:16px}}
 .modal{background:var(--surface);border:1px solid var(--border);width:100%;
   max-width:600px;max-height:92vh;overflow-y:auto;animation:slideUp .25s ease;
   border-radius:var(--radius) var(--radius) 0 0;padding:24px 20px;
-  padding-bottom:calc(24px + var(--safe-bot))}
-@media(min-width:600px){.modal{border-radius:var(--radius);padding:28px;padding-bottom:28px;animation:fadeIn .2s ease}}
+  padding-bottom:calc(24px + var(--safe-bot));touch-action:pan-y;will-change:transform;transition:transform .25s ease}
+@media(min-width:600px){.modal{border-radius:var(--radius);padding:28px;padding-bottom:28px;animation:fadeIn .2s ease;touch-action:auto}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+body.modal-open{overflow:hidden;position:fixed;width:100%}
 .modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;display:block}
 @media(min-width:600px){.modal-handle{display:none}}
 .modal-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:18px}
@@ -793,13 +794,70 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+      <button class="btn btn-ghost" onclick="modalClose('editModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveEditQuestion()">Save Changes</button>
     </div>
   </div>
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════
+//  MODAL SYSTEM — scroll lock + swipe to dismiss
+// ═══════════════════════════════════════════════════
+let _scrollY=0;
+function modalOpen(id){
+  const el=document.getElementById(id); if(!el) return;
+  _scrollY=window.scrollY;
+  document.body.classList.add('modal-open');
+  document.body.style.top=`-${_scrollY}px`;
+  el.style.display='flex';
+  // Attach swipe-to-dismiss on the inner .modal element (mobile only)
+  const modal=el.querySelector('.modal');
+  if(modal && window.innerWidth<600) _attachSwipe(modal, ()=>modalClose(id));
+}
+function modalClose(id){
+  const el=document.getElementById(id); if(!el) return;
+  el.style.display='none';
+  // Restore scroll only if no other modals are open
+  const anyOpen=[...document.querySelectorAll('.modal-overlay')].some(m=>m.style.display==='flex');
+  if(!anyOpen){
+    document.body.classList.remove('modal-open');
+    document.body.style.top='';
+    window.scrollTo(0,_scrollY);
+  }
+}
+function _attachSwipe(modal, onDismiss){
+  let startY=0, currentY=0, dragging=false;
+  function onTouchStart(e){
+    // Only start swipe from handle or top 60px of modal
+    const touch=e.touches[0];
+    const rect=modal.getBoundingClientRect();
+    if(touch.clientY-rect.top>60 && !e.target.classList.contains('modal-handle')) return;
+    startY=touch.clientY; dragging=true; modal.style.transition='none';
+  }
+  function onTouchMove(e){
+    if(!dragging) return;
+    currentY=e.touches[0].clientY;
+    const delta=Math.max(0,currentY-startY);
+    modal.style.transform=`translateY(${delta}px)`;
+  }
+  function onTouchEnd(){
+    if(!dragging) return; dragging=false;
+    const delta=currentY-startY;
+    modal.style.transition='';
+    if(delta>80){ modal.style.transform=`translateY(100%)`; setTimeout(()=>{ modal.style.transform=''; onDismiss(); },220); }
+    else modal.style.transform='';
+    startY=0; currentY=0;
+  }
+  modal.removeEventListener('touchstart',modal._swipeStart);
+  modal.removeEventListener('touchmove',modal._swipeMove);
+  modal.removeEventListener('touchend',modal._swipeEnd);
+  modal._swipeStart=onTouchStart; modal._swipeMove=onTouchMove; modal._swipeEnd=onTouchEnd;
+  modal.addEventListener('touchstart',onTouchStart,{passive:true});
+  modal.addEventListener('touchmove',onTouchMove,{passive:true});
+  modal.addEventListener('touchend',onTouchEnd);
+}
+
 // ═══════════════════════════════════════════════════
 //  PWA — Service Worker + Install prompt
 // ═══════════════════════════════════════════════════
@@ -1032,12 +1090,12 @@ function openCreateSetModal(){
   document.getElementById('newSetName').value='';
   populateFolderSelects();
   document.getElementById('newSetFolder').value='';
-  document.getElementById('createSetModal').style.display='flex';
+  modalOpen('createSetModal');
   setTimeout(()=>document.getElementById('newSetName').focus(),100);
 }
 function closeCreateSetModal(e){
   if(e&&e.target!==document.getElementById('createSetModal')) return;
-  document.getElementById('createSetModal').style.display='none';
+  modalClose('createSetModal');
 }
 function confirmCreateSet(){
   const name=document.getElementById('newSetName').value.trim();
@@ -1046,18 +1104,18 @@ function confirmCreateSet(){
   const sets=loadSets(), id=uid();
   sets.push({id,name,folderId,created:Date.now()});
   saveSets(sets);
-  document.getElementById('createSetModal').style.display='none';
+  modalClose('createSetModal');
   renderSetsGrid();
   openSet(id);
 }
 function openFolderManagerModal(){
   renderFolderList();
   populateFolderSelects();
-  document.getElementById('folderManagerModal').style.display='flex';
+  modalOpen('folderManagerModal');
 }
 function closeFolderManagerModal(e){
   if(e&&e.target!==document.getElementById('folderManagerModal')) return;
-  document.getElementById('folderManagerModal').style.display='none';
+  modalClose('folderManagerModal');
   populateFolderSelects();
 }
 function renderFolderList(){
@@ -1307,11 +1365,11 @@ function openEditModal(i){
     d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"${isC?' checked':''}><input type="text" class="edit-opt-text" value="${esc(opt)}"><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
     b.appendChild(d);
   });
-  document.getElementById('editModal').style.display='flex';
+  modalOpen('editModal');
 }
 function closeEditModal(e){
   if(e&&e.target!==document.getElementById('editModal')) return;
-  document.getElementById('editModal').style.display='none'; editingIdx=null;
+  modalClose('editModal'); editingIdx=null;
 }
 function updateEditOptionControls(){
   const t=document.getElementById('editQType').value==='multi'?'checkbox':'radio';
@@ -1338,7 +1396,7 @@ function saveEditQuestion(){
   questions[editingIdx]=updatedQ;
   const newKey=flagKey(questions[editingIdx]);
   if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
-  save(); document.getElementById('editModal').style.display='none'; editingIdx=null; renderQList();
+  save(); modalClose('editModal'); editingIdx=null; renderQList();
 }
 
 // ═══════════════════════════════════════════════════
@@ -1428,26 +1486,26 @@ function openPreQuizModal(){
     row('⏱','Timer per Q',timer?timer+'s':'Off', timer?'var(--orange)':'var(--muted)')+
     (timer?row('⏭','Auto-advance',autoAdv?'On':'Off'):'');
 
-  document.getElementById('preQuizModal').style.display='flex';
+  modalOpen('preQuizModal');
 }
 function closePreQuizModal(e){
   if(e&&e.target!==document.getElementById('preQuizModal')) return;
-  document.getElementById('preQuizModal').style.display='none';
+  modalClose('preQuizModal');
 }
 function openImportExportModal(){
-  document.getElementById('importExportModal').style.display='flex';
+  modalOpen('importExportModal');
 }
 function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
-  document.getElementById('importExportModal').style.display='none';
+  modalClose('importExportModal');
 }
 function openOrganizeModal(){
   renderOrganizeList();
-  document.getElementById('organizeModal').style.display='flex';
+  modalOpen('organizeModal');
 }
 function closeOrganizeModal(e){
   if(e&&e.target!==document.getElementById('organizeModal')) return;
-  document.getElementById('organizeModal').style.display='none';
+  modalClose('organizeModal');
 }
 let _orgItems=[];
 let _orgDragIdx=null;
@@ -1504,15 +1562,15 @@ function orgDrop(e,targetIdx){
 function saveOrganize(){
   // Persist order to dedicated gridOrder key
   saveGridOrder(_orgItems.map(x=>({type:x.type,id:x.id})));
-  document.getElementById('organizeModal').style.display='none';
+  modalClose('organizeModal');
   renderSetsGrid();
 }
 function openQuizOptsModal(){
-  document.getElementById('quizOptsModal').style.display='flex';
+  modalOpen('quizOptsModal');
 }
 function closeQuizOptsModal(e){
   if(e&&e.target!==document.getElementById('quizOptsModal')) return;
-  document.getElementById('quizOptsModal').style.display='none';
+  modalClose('quizOptsModal');
   // If we're inside a set, refresh the pre-quiz modal summary
   if(activeSetId) openPreQuizModal();
 }
@@ -1531,11 +1589,11 @@ function openExportModal(){
       </div>
     </label>`;
   }).join('');
-  document.getElementById('exportModal').style.display='flex';
+  modalOpen('exportModal');
 }
 function closeExportModal(e){
   if(e&&e.target!==document.getElementById('exportModal')) return;
-  document.getElementById('exportModal').style.display='none';
+  modalClose('exportModal');
 }
 function exportSelectAll(){
   document.querySelectorAll('.export-set-check').forEach(c=>c.checked=true);
@@ -1559,7 +1617,7 @@ function exportSelected(){
     const payload={version:3,exported:new Date().toISOString(),folders:exportFolders,sets:sets.map(s=>({id:s.id,name:s.name,folderId:s.folderId||null,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id),incorrectTracking:loadIncorrect(s.id)}))};
     dlBlob(JSON.stringify(payload,null,2),`quizforge-${sets.length}sets-${new Date().toISOString().slice(0,10)}.json`);
   }
-  document.getElementById('exportModal').style.display='none';
+  modalClose('exportModal');
   showHomeMsg(`✓ Exported ${checked.length} set(s).`,true);
 }
 function exportAll(){
@@ -1898,11 +1956,11 @@ function openExitQuizModal(){
       </div>
       <p style="font-size:.76rem;color:var(--muted);padding:4px 0">Flags and incorrect tracking from answered questions will be saved.</p>
     </div>`;
-  document.getElementById('exitQuizModal').style.display='flex';
+  modalOpen('exitQuizModal');
 }
 function closeExitQuizModal(e){
   if(e&&e.target!==document.getElementById('exitQuizModal')) return;
-  document.getElementById('exitQuizModal').style.display='none';
+  modalClose('exitQuizModal');
 }
 function showPartialResults(){
   // Only count questions that were actually answered
