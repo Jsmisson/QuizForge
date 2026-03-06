@@ -775,8 +775,8 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 </div>
 
 <!-- EXIT QUIZ MODAL -->
-<div class="modal-overlay" id="exitQuizModal" style="display:none" onclick="closeExitQuizModal(event)">
-  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;animation:none">
+<div class="modal-overlay" id="exitQuizModal" style="display:none;touch-action:auto" onclick="closeExitQuizModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:400px;animation:none;transition:none;touch-action:auto">
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
@@ -977,7 +977,7 @@ function modalOpen(id){
   }
   el.style.display='flex';
   const modal=el.querySelector('.modal');
-  if(modal && window.innerWidth<600) _attachSwipe(modal, ()=>modalClose(id));
+  if(modal && window.innerWidth<600 && id !== 'exitQuizModal') _attachSwipe(modal, ()=>modalClose(id));
 }
 function modalClose(id){
   const el=document.getElementById(id); if(!el) return;
