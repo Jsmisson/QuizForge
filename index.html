@@ -409,9 +409,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   font-weight:600;z-index:200;white-space:nowrap}
 
 /* ══ GOOGLE DRIVE SYNC ══ */
-#syncBar{display:flex;align-items:center;gap:8px;padding:8px 12px;
-  background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  margin-bottom:14px;font-size:.78rem;flex-wrap:wrap}
+#syncBar{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  font-size:.78rem;flex-wrap:wrap}
 #syncBar.hidden{display:none}
 .sync-avatar{width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0}
 .sync-name{color:var(--text);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -419,12 +419,28 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 .sync-status.ok{color:var(--green)}
 .sync-status.err{color:var(--red)}
 .sync-status.busy{color:var(--accent)}
-#syncSignInBtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-  padding:8px 14px;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;
-  color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;
-  transition:border-color .18s;white-space:nowrap}
+#syncSignInBtn{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:12px 16px;font-family:'Sora',sans-serif;font-size:.82rem;font-weight:700;
+  color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;
+  transition:border-color .18s}
 #syncSignInBtn:hover{border-color:var(--accent);color:var(--accent)}
 #syncSignInBtn svg{flex-shrink:0}
+
+/* ── Persistent header sync strip ── */
+#syncStrip{display:none;align-items:center;gap:7px;padding:5px 12px;
+  background:var(--surface2);border-bottom:1px solid var(--border);
+  font-size:.7rem;color:var(--muted);cursor:pointer;
+  transition:background .15s}
+#syncStrip:hover{background:var(--surface)}
+#syncStrip.visible{display:flex}
+.sstrip-avatar{width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.sstrip-name{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.sstrip-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sstrip-dot.ok{background:var(--green)}
+.sstrip-dot.err{background:var(--red)}
+.sstrip-dot.busy{background:var(--accent);animation:pulse .9s infinite}
+.sstrip-status{flex:1}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ══ SPACED REPETITION (SRS) ══ */
 .srs-due-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;
@@ -440,9 +456,6 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   <!-- OFFLINE BADGE -->
   <div id="offlineBadge">⚠ Offline</div>
 
-  <!-- GOOGLE DRIVE SYNC BAR (injected by JS once DOM ready) -->
-  <div id="syncBarWrap"></div>
-
   <!-- INSTALL BANNER -->
   <div id="installBanner">
     <p>📱 <strong>Add to Home Screen</strong> for the full app experience — works offline too.</p>
@@ -457,6 +470,15 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
     <div class="header-actions" id="headerRight"></div>
   </header>
+
+  <!-- SYNC STATUS STRIP (visible when signed into Google Drive) -->
+  <div id="syncStrip" onclick="openImportExportModal()" title="Open sync settings">
+    <div class="sstrip-dot" id="sstripDot"></div>
+    <img class="sstrip-avatar" id="sstripAvatar" src="" style="display:none" referrerpolicy="no-referrer">
+    <span class="sstrip-name" id="sstripName"></span>
+    <span class="sstrip-status" id="sstripStatus">Google Drive</span>
+    <span style="opacity:.4;font-size:.65rem">⇅ tap to manage</span>
+  </div>
 
   <!-- ═══ SETS HOME ═══ -->
   <div id="view-home" class="view active">
@@ -821,7 +843,8 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">⇅ Import / Export</div>
 
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Export</div>
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">☁ Google Drive Sync</div>
+    <div id="syncBarWrap" style="margin-bottom:18px"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
       <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeImportExportModal();openExportModal()">
         <div style="font-weight:700;margin-bottom:2px">📋 Export Set(s)</div>
@@ -2616,17 +2639,18 @@ const GDRIVE = (() => {
     if(!wrap) return;
     if(!_token){
       wrap.innerHTML = `
-        <div style="margin-bottom:14px">
-          <button id="syncSignInBtn" onclick="GDRIVE.signIn()">
-            <svg width="16" height="16" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Sign in with Google to sync
-          </button>
-        </div>`;
+        <button id="syncSignInBtn" onclick="GDRIVE.signIn()">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Sign in with Google to sync
+        </button>`;
+      // Hide strip when signed out
+      const strip = document.getElementById('syncStrip');
+      if(strip) strip.classList.remove('visible');
     } else {
       const name = _userProfile ? _userProfile.name : 'Signed in';
       const pic  = _userProfile ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer">` : '';
@@ -2638,14 +2662,27 @@ const GDRIVE = (() => {
           <button class="btn btn-ghost btn-sm" onclick="GDRIVE.syncNow()" style="padding:5px 10px;font-size:.7rem">↑↓ Sync</button>
           <button class="btn btn-ghost btn-sm" onclick="GDRIVE.signOut()" style="padding:5px 10px;font-size:.7rem;color:var(--muted)">Sign out</button>
         </div>`;
+      // Show and populate the persistent strip
+      const strip = document.getElementById('syncStrip');
+      if(strip){
+        strip.classList.add('visible');
+        const av = document.getElementById('sstripAvatar');
+        if(av && _userProfile){ av.src=_userProfile.picture; av.style.display='block'; }
+        const nm = document.getElementById('sstripName');
+        if(nm) nm.textContent = _userProfile ? _userProfile.name : 'Google Drive';
+      }
     }
   }
 
   function _setStatus(msg, type=''){
+    // Update status in modal bar
     const el = document.getElementById('syncStatus');
-    if(!el) return;
-    el.textContent = '● ' + msg;
-    el.className = 'sync-status' + (type ? ' ' + type : '');
+    if(el){ el.textContent = '● ' + msg; el.className = 'sync-status' + (type?' '+type:''); }
+    // Update persistent strip
+    const dot = document.getElementById('sstripDot');
+    const txt = document.getElementById('sstripStatus');
+    if(dot){ dot.className = 'sstrip-dot' + (type?' '+type:''); }
+    if(txt) txt.textContent = msg;
   }
 
   // ── Auth ──
