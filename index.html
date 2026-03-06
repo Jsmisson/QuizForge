@@ -1073,20 +1073,153 @@ window.addEventListener('offline',updateOnlineStatus);
 updateOnlineStatus();
 
 // ═══════════════════════════════════════════════════
+//  IMAGE STORE  (IndexedDB — keeps images out of localStorage)
+// ═══════════════════════════════════════════════════
+const ImageStore = (() => {
+  const DB = 'quizforge-images', STORE = 'images', VER = 1;
+  let _db = null;
+
+  function _open(){
+    if(_db) return Promise.resolve(_db);
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB, VER);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => { _db = e.target.result; res(_db); };
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  // Save a base64 data-URL under a generated key; returns the key
+  async function put(dataURL){
+    if(!dataURL) return null;
+    const key = 'img_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+    const db  = await _open();
+    await new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(dataURL, key);
+      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
+    });
+    return key;
+  }
+
+  // Retrieve a data-URL by key (returns null if missing)
+  async function get(key){
+    if(!key) return null;
+    const db = await _open();
+    return new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(key);
+      req.onsuccess = () => res(req.result || null);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+
+  // Delete a key
+  async function del(key){
+    if(!key) return;
+    const db = await _open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
+    });
+  }
+
+  // Return {key: dataURL} for every key in a given set (for Drive export)
+  async function getAll(keys){
+    if(!keys || !keys.length) return {};
+    const db  = await _open();
+    const out = {};
+    await Promise.all(keys.map(k => new Promise((res, rej) => {
+      const tx  = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(k);
+      req.onsuccess = () => { if(req.result) out[k] = req.result; res(); };
+      req.onerror   = e => rej(e.target.error);
+    })));
+    return out;
+  }
+
+  // Bulk-write {key: dataURL} map (used during Drive sync restore)
+  async function putAll(map){
+    if(!map || !Object.keys(map).length) return;
+    const db = await _open();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const st = tx.objectStore(STORE);
+      Object.entries(map).forEach(([k, v]) => st.put(v, k));
+      tx.oncomplete = res; tx.onerror = e => rej(e.target.error);
+    });
+  }
+
+  // Delete all keys NOT in the keepSet (used after sync to prune orphans)
+  async function pruneExcept(keepSet){
+    const db = await _open();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const st = tx.objectStore(STORE);
+      const req = st.getAllKeys();
+      req.onsuccess = () => {
+        req.result.filter(k => !keepSet.has(k)).forEach(k => st.delete(k));
+        res();
+      };
+      req.onerror = e => rej(e.target.error);
+    });
+  }
+
+  return { put, get, del, getAll, putAll, pruneExcept };
+})();
+
+// Helper: collect all imageRef values from a questions array
+function _collectImageRefs(questions){
+  return (questions || []).map(q => q.imageRef).filter(Boolean);
+}
+
+// ── Quota-safe localStorage writer ──────────────────────────────────────────
+// Priority order for eviction (lowest priority evicted first):
+//   srs  →  incorrect  →  flags  →  sets/folders/questions (never evicted)
+function _lsSet(key, value){
+  const evictPrefixes = ['qforge_srs_', 'qforge_incorrect_', 'qforge_flags_'];
+  for(let attempt = 0; attempt <= evictPrefixes.length; attempt++){
+    try {
+      localStorage.setItem(key, value);
+      return;
+    } catch(e) {
+      if(e instanceof DOMException && (
+          e.code === 22 || e.code === 1014 ||
+          e.name === 'QuotaExceededError' ||
+          e.name === 'NS_ERROR_DOM_QUOTA_REACHED')){
+        if(attempt < evictPrefixes.length){
+          const prefix = evictPrefixes[attempt];
+          Object.keys(localStorage)
+            .filter(k => k.startsWith(prefix))
+            .forEach(k => localStorage.removeItem(k));
+          console.warn('[QuizForge] localStorage quota hit — evicted keys with prefix:', prefix);
+        } else {
+          console.error('[QuizForge] localStorage quota exceeded and no safe keys to evict. Key:', key);
+          if(typeof showToast === 'function')
+            showToast('⚠️ Storage full — some progress data could not be saved. Consider exporting your sets.', 5000);
+        }
+      } else { throw e; }
+    }
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════
 //  STORAGE
 // ═══════════════════════════════════════════════════
 function loadSets(){ return JSON.parse(localStorage.getItem('qforge_sets')||'[]'); }
-function saveSets(s){ localStorage.setItem('qforge_sets',JSON.stringify(s)); }
+function saveSets(s){ _lsSet('qforge_sets',JSON.stringify(s)); }
 function loadFolders(){ return JSON.parse(localStorage.getItem('qforge_folders')||'[]'); }
-function saveFolders(f){ localStorage.setItem('qforge_folders',JSON.stringify(f)); }
+function saveFolders(f){ _lsSet('qforge_folders',JSON.stringify(f)); }
 function loadQs(id){ return JSON.parse(localStorage.getItem('qforge_qs_'+id)||'[]'); }
-function saveQs(id,qs){ localStorage.setItem('qforge_qs_'+id,JSON.stringify(qs)); }
+function saveQs(id,qs){ _lsSet('qforge_qs_'+id,JSON.stringify(qs)); }
 function loadFlags(id){ return JSON.parse(localStorage.getItem('qforge_flags_'+id)||'[]'); }
-function saveFlags(id,fl){ localStorage.setItem('qforge_flags_'+id,JSON.stringify(fl)); }
+function saveFlags(id,fl){ _lsSet('qforge_flags_'+id,JSON.stringify(fl)); }
 
 // Incorrect tracking: {key: questionText, streak: consecutive correct count needed to clear}
 function loadIncorrect(id){ return JSON.parse(localStorage.getItem('qforge_incorrect_'+id)||'[]'); }
-function saveIncorrect(id,arr){ localStorage.setItem('qforge_incorrect_'+id,JSON.stringify(arr)); }
+function saveIncorrect(id,arr){ _lsSet('qforge_incorrect_'+id,JSON.stringify(arr)); }
 function incorrectKey(q){ return q.type==='card'?('card:'+q.term.trim()):q.text.trim(); }
 function isIncorrect(q){ return loadIncorrect(activeSetId).some(x=>x.key===incorrectKey(q)); }
 function markIncorrect(q){
@@ -1243,7 +1376,7 @@ function openSet(id){
 }
 
 function loadGridOrder(){ return JSON.parse(localStorage.getItem('qforge_grid_order')||'[]'); }
-function saveGridOrder(order){ localStorage.setItem('qforge_grid_order',JSON.stringify(order)); recordModified('__grid__','order'); }
+function saveGridOrder(order){ _lsSet('qforge_grid_order',JSON.stringify(order)); recordModified('__grid__','order'); }
 
 function renderSetsGrid(){
   const fb=document.getElementById('createSetFallback'); if(fb) fb.remove();
@@ -1401,7 +1534,7 @@ function createSet(){
 }
 
 function loadTombstones(){ return JSON.parse(localStorage.getItem('qforge_tombstones')||'[]'); }
-function saveTombstones(t){ localStorage.setItem('qforge_tombstones',JSON.stringify(t)); }
+function saveTombstones(t){ _lsSet('qforge_tombstones',JSON.stringify(t)); }
 function addTombstone(id){
   const t=loadTombstones();
   if(!t.find(x=>x.id===id)) t.push({id, deletedAt: Date.now()});
@@ -1411,6 +1544,9 @@ function addTombstone(id){
 function deleteSet(id){
   const sets=loadSets(), set=sets.find(s=>s.id===id);
   if(!set||!confirm(`Delete "${set.name}" and all questions?`)) return;
+  // Prune images for this set before deleting
+  const qs=loadQs(id);
+  qs.forEach(q=>{ if(q.imageRef) ImageStore.del(q.imageRef); });
   sets.splice(sets.findIndex(s=>s.id===id),1);
   addTombstone(id);
   saveSets(sets); localStorage.removeItem('qforge_qs_'+id); localStorage.removeItem('qforge_flags_'+id);
@@ -1448,7 +1584,7 @@ function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
 function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
 function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); recordClear(activeSetId,'flags'); renderQList(); }
 function loadClearTimestamps(){ return JSON.parse(localStorage.getItem('qforge_clear_ts')||'{}'); }
-function saveClearTimestamps(ts){ localStorage.setItem('qforge_clear_ts',JSON.stringify(ts)); }
+function saveClearTimestamps(ts){ _lsSet('qforge_clear_ts',JSON.stringify(ts)); }
 function recordClear(setId, field){
   const ts = loadClearTimestamps();
   if(!ts[setId]) ts[setId] = {};
@@ -1501,8 +1637,9 @@ function renderQList(){
     const displayText=isCard?q.term:(q.text||'');
     const badgeLabel=isCard?'Card':q.type==='multi'?'Multi':'Single';
     const badgeClass=isCard?' card-type':q.type==='multi'?' multi':'';
+    const hasImg = q.imageRef || q.image;
     return `<div class="q-item${fl?' is-flagged':''}${inc?' is-incorrect':''}">
-      ${q.image?`<img class="q-item-img" src="${q.image}" alt="">`:'' }
+      ${hasImg?`<img class="q-item-img" id="qimg_list_${i}" src="" alt="">`:'' }
       <div class="q-item-text" onclick="openEditModal(${i})">${esc(displayText.slice(0,80))}${displayText.length>80?'…':''}</div>
       <div class="q-item-right">
         <div class="q-item-badges">
@@ -1518,11 +1655,19 @@ function renderQList(){
       </div>
     </div>`;
   }).join('');
+  // Async: populate image thumbnails after render
+  shown.forEach(({q,i}) => {
+    if(!q.imageRef && !q.image) return;
+    _resolveImgSrc(q).then(src => {
+      const el = document.getElementById('qimg_list_'+i);
+      if(el && src) el.src = src;
+    });
+  });
 }
 
 function listToggleFlag(i){ toggleGlobalFlag(questions[i]); renderQList(); }
-function deleteQ(i){ if(confirm('Delete this question?')){ questions.splice(i,1); save(); renderQList(); } }
-function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ questions=[]; save(); renderQList(); } }
+function deleteQ(i){ if(confirm('Delete this question?')){ const q=questions[i]; if(q.imageRef) ImageStore.del(q.imageRef); questions.splice(i,1); save(); renderQList(); } }
+function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ questions.forEach(q=>{ if(q.imageRef) ImageStore.del(q.imageRef); }); questions=[]; save(); renderQList(); } }
 
 // ═══════════════════════════════════════════════════
 //  ADD FORM
@@ -1561,7 +1706,7 @@ function cancelEdit(){
   _resetNewQImgUI();
   showView('manage');
 }
-let _newQImg=null, _editQImg=null;
+let _newQImg=null, _editQImg=null;  // hold data-URLs in memory during editing only
 
 function _setImgUI(prefix, src){
   const ref = prefix==='new' ? '_newQImg' : '_editQImg';
@@ -1585,7 +1730,24 @@ function handleEditQImg(evt){
 }
 function removeEditQImg(){ _setImgUI('edit',null); }
 function _resetNewQImgUI(){ _setImgUI('new',null); }
-function _loadImgIntoEdit(img){ _setImgUI('edit',img||null); }
+
+// Load an imageRef from IndexedDB into the edit UI
+async function _loadImgIntoEdit(imageRef){
+  if(!imageRef){ _setImgUI('edit',null); return; }
+  // If it looks like a legacy base64 blob stored directly, show it as-is
+  if(imageRef.startsWith('data:')){ _setImgUI('edit', imageRef); return; }
+  const src = await ImageStore.get(imageRef);
+  _setImgUI('edit', src||null);
+}
+
+// Resolve any imageRef on a question to a displayable src for rendering
+async function _resolveImgSrc(q){
+  if(!q) return null;
+  if(q.image && q.image.startsWith('data:')) return q.image; // legacy inline
+  if(q.imageRef) return await ImageStore.get(q.imageRef);
+  return null;
+}
+
 function saveQuestion(){
   const type=document.getElementById('newQType').value;
   let q;
@@ -1605,10 +1767,19 @@ function saveQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     q={text,type,options,correct,explain:document.getElementById('newQExplain').value.trim()};
   }
-  if(_newQImg) q.image=_newQImg;
-  questions.push(q);
-  _resetNewQImgUI();
-  save(); cancelEdit();
+  if(_newQImg){
+    // Save image to IndexedDB asynchronously, then attach ref and persist
+    ImageStore.put(_newQImg).then(ref => {
+      q.imageRef = ref;
+      questions.push(q);
+      _resetNewQImgUI();
+      save(); cancelEdit();
+    });
+  } else {
+    questions.push(q);
+    _resetNewQImgUI();
+    save(); cancelEdit();
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1634,7 +1805,7 @@ function openEditModal(i){
       b.appendChild(d);
     });
   }
-  _loadImgIntoEdit(q.image||null);
+  _loadImgIntoEdit(q.imageRef || q.image || null);  // supports both new ref and legacy inline
   modalOpen('editModal');
 }
 function closeEditModal(e){
@@ -1680,11 +1851,32 @@ function saveEditQuestion(){
     if(!correct.length) return alert('Mark at least one correct answer.');
     updatedQ={text,type,options,correct,explain:document.getElementById('editQExplain').value.trim()};
   }
-  if(_editQImg) updatedQ.image=_editQImg;
-  questions[editingIdx]=updatedQ;
-  const newKey=flagKey(questions[editingIdx]);
-  if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
-  save(); modalClose('editModal'); editingIdx=null; renderQList();
+  const oldImgRef = questions[editingIdx].imageRef || null;
+  const _doSaveEdit = (ref) => {
+    if(ref !== undefined) updatedQ.imageRef = ref;
+    else if(questions[editingIdx].imageRef && !_editQImg) {
+      // image was removed — keep null, clean up old ref
+      ImageStore.del(oldImgRef);
+    } else if(questions[editingIdx].imageRef) {
+      updatedQ.imageRef = questions[editingIdx].imageRef; // unchanged
+    }
+    // migrate legacy inline image
+    if(!updatedQ.imageRef && questions[editingIdx].image && !_editQImg)
+      updatedQ.image = questions[editingIdx].image;
+    questions[editingIdx]=updatedQ;
+    const newKey=flagKey(questions[editingIdx]);
+    if(oldKey!==newKey){ const fi=flaggedKeys.indexOf(oldKey); if(fi>=0){flaggedKeys[fi]=newKey;saveFlg();} }
+    save(); modalClose('editModal'); editingIdx=null; renderQList();
+  };
+  if(_editQImg){
+    // New image selected — save to IndexedDB, delete old ref if any
+    ImageStore.put(_editQImg).then(ref => {
+      if(oldImgRef) ImageStore.del(oldImgRef);
+      _doSaveEdit(ref);
+    });
+  } else {
+    _doSaveEdit(undefined);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -2062,9 +2254,8 @@ function importBank(evt){
   };
   reader.readAsText(file);
 }
-function exportFullBackup(){
+async function exportFullBackup(){
   const sets=loadSets(), folders=loadFolders(), gridOrder=loadGridOrder();
-  // Collect quiz settings from DOM
   const settings={
     shuffle:document.getElementById('settShuffle').checked,
     shuffleOpts:document.getElementById('settShuffleOpts').checked,
@@ -2077,12 +2268,15 @@ function exportFullBackup(){
     cardFirst:document.getElementById('settCardFirst').value,
     cardsOnly:document.getElementById('settCardsOnly').checked
   };
+  // Collect all imageRef keys and fetch blobs from IndexedDB
+  const allRefs=[];
+  sets.forEach(s=>loadQs(s.id).forEach(q=>{ if(q.imageRef) allRefs.push(q.imageRef); }));
+  const imageMap=allRefs.length ? await ImageStore.getAll(allRefs) : {};
   const payload={
-    type:'fullbackup', version:4,
+    type:'fullbackup', version:5,
     exported:new Date().toISOString(),
-    settings,
-    gridOrder,
-    folders,
+    settings, gridOrder, folders,
+    images: imageMap,
     sets:sets.map(s=>({
       id:s.id, name:s.name, folderId:s.folderId||null, created:s.created,
       questions:loadQs(s.id),
@@ -2091,12 +2285,12 @@ function exportFullBackup(){
     }))
   };
   dlBlob(JSON.stringify(payload,null,2),`quizforge-backup-${new Date().toISOString().slice(0,10)}.json`);
-  showHomeMsg('✓ Full backup exported.',true);
+  showHomeMsg('✓ Full backup exported (images included).',true);
 }
 function importFullBackup(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async e=>{
     try{
       const data=JSON.parse(e.target.result);
       if(data.type!=='fullbackup') throw new Error('Not a full backup file. Use Import Set(s) instead.');
@@ -2104,6 +2298,10 @@ function importFullBackup(evt){
       // Clear everything
       const oldSets=loadSets();
       oldSets.forEach(s=>{ localStorage.removeItem('qforge_qs_'+s.id); localStorage.removeItem('qforge_flags_'+s.id); localStorage.removeItem('qforge_incorrect_'+s.id); });
+      // Restore images into IndexedDB first
+      if(data.images && typeof data.images === 'object'){
+        await ImageStore.putAll(data.images);
+      }
       // Restore folders
       saveFolders(Array.isArray(data.folders)?data.folders:[]);
       // Restore sets
@@ -2117,9 +2315,7 @@ function importFullBackup(evt){
         });
       }
       saveSets(newSets);
-      // Restore grid order
       if(Array.isArray(data.gridOrder)) saveGridOrder(data.gridOrder);
-      // Restore settings
       if(data.settings){
         const s=data.settings;
         const set=(id,val)=>{ const el=document.getElementById(id); if(el) typeof val==='boolean'?el.checked=val:el.value=val; };
@@ -2234,7 +2430,7 @@ function renderQuestion(){
         <div class="flip-card${wasAnswered?' flipped':''}" id="flipCard">
           <div class="flip-face flip-face-front">
             <div class="flip-label">${frontLabel}</div>
-            ${q.image?`<img class="flip-card-img" src="${q.image}" alt="">`:''}
+            ${(q.imageRef||q.image)?`<img class="flip-card-img" id="flipCardImg" src="" alt="">`:''}
             <div class="flip-text">${esc(frontText)}</div>
             <div class="flip-tap-hint">Tap to reveal ${backLabel.toLowerCase()}</div>
           </div>
@@ -2270,6 +2466,13 @@ function renderQuestion(){
           </div>
         </div>`;
     }
+        // Async: populate flashcard image from IndexedDB after render
+    if(q.imageRef || q.image){
+      _resolveImgSrc(q).then(src => {
+        const fi = document.getElementById('flipCardImg');
+        if(fi && src) fi.src = src;
+      });
+    }
     updateHotkeyLegend(true);
   } else {
     // MC mode
@@ -2277,8 +2480,9 @@ function renderQuestion(){
     footer.innerHTML=`<span class="quiz-footer-hint" id="selHint"></span><button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>`;
     document.getElementById('questionText').textContent=q.text;
     const qImg=document.getElementById('questionImg');
-    if(q.image){ qImg.src=q.image; qImg.style.display='block'; }
-    else { qImg.src=''; qImg.style.display='none'; }
+    if(q.imageRef || q.image){
+      _resolveImgSrc(q).then(src => { if(src){ qImg.src=src; qImg.style.display='block'; } });
+    } else { qImg.src=''; qImg.style.display='none'; }
     const hint=document.getElementById('questionHint');
     if(q.type==='multi'){hint.textContent=`Select ${q.correct.length} correct answer(s)`;hint.style.display='flex';}
     else hint.style.display='none';
@@ -2848,7 +3052,7 @@ if(document.readyState === 'loading'){
 //  SPACED REPETITION (SM-2)
 // ═══════════════════════════════════════════════════
 function loadSRS(id){ return JSON.parse(localStorage.getItem('qforge_srs_'+id)||'[]'); }
-function saveSRS(id,arr){ localStorage.setItem('qforge_srs_'+id,JSON.stringify(arr)); }
+function saveSRS(id,arr){ _lsSet('qforge_srs_'+id,JSON.stringify(arr)); }
 function srsKey(q){ return q.type==='card'?'card:'+q.term.trim():q.text.trim(); }
 
 function updateSRS(setId, q, isCorrect){
@@ -3128,18 +3332,29 @@ const GDRIVE = (() => {
   }
 
   // ── Build full backup payload (mirrors exportFullBackup) ──
-  function _buildPayload(){
+  async function _buildPayload(){
     const sets = loadSets(), folders = loadFolders();
     const tombstones = loadTombstones();
     const clearTs = loadClearTimestamps();
     console.log('[Sync] building payload — sets:', sets.length, 'tombstones:', tombstones);
+
+    // Collect all imageRef keys across all sets
+    const allRefs = [];
+    sets.forEach(s => {
+      const qs = loadQs(s.id);
+      qs.forEach(q => { if(q.imageRef) allRefs.push(q.imageRef); });
+    });
+    // Fetch all images from IndexedDB in one pass
+    const imageMap = allRefs.length ? await ImageStore.getAll(allRefs) : {};
+
     return {
-      type: 'fullbackup', version: 4,
+      type: 'fullbackup', version: 5,
       synced: new Date().toISOString(),
       tombstones,
       clearTimestamps: clearTs,
       gridOrder: loadGridOrder(),
       folders,
+      images: imageMap,  // {imageRef: dataURL}
       sets: sets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
         questions:          loadQs(s.id),
@@ -3151,8 +3366,15 @@ const GDRIVE = (() => {
   }
 
   // ── Restore from cloud payload — true two-way merge ──
-  function _applyPayload(data){
+  async function _applyPayload(data){
     if(!data || !Array.isArray(data.sets)) return;
+
+    // Restore images from Drive payload into IndexedDB
+    if(data.images && typeof data.images === 'object'){
+      const incoming = data.images;
+      await ImageStore.putAll(incoming);
+      console.log('[Sync] restored', Object.keys(incoming).length, 'images from cloud payload');
+    }
 
     // Merge tombstones — union of local + cloud deletions
     const localTombstones  = loadTombstones();
@@ -3164,7 +3386,7 @@ const GDRIVE = (() => {
     cloudTombstones.forEach(ct => {
       if(!mergedTombstones.find(t => t.id === ct.id)) mergedTombstones.push(ct);
     });
-    localStorage.setItem('qforge_tombstones', JSON.stringify(mergedTombstones));
+    _lsSet('qforge_tombstones', JSON.stringify(mergedTombstones));
     const deletedIds = new Set(mergedTombstones.map(t => t.id));
     console.log('[Sync] deletedIds:', [...deletedIds]);
 
@@ -3200,7 +3422,7 @@ const GDRIVE = (() => {
     (data.folders || []).forEach(cf => {
       if(!mergedFolders.find(f => f.id === cf.id)) mergedFolders.push(cf);
     });
-    localStorage.setItem('qforge_folders', JSON.stringify(mergedFolders));
+    _lsSet('qforge_folders', JSON.stringify(mergedFolders));
 
     // Build merged set list — local sets minus tombstoned, plus new cloud sets
     const mergedSets = localSets.filter(s => !deletedIds.has(s.id));
@@ -3229,7 +3451,7 @@ const GDRIVE = (() => {
         if(typeof activeSetId !== 'undefined' && cs.id === activeSetId){
           console.log('[Sync] skipping question overwrite for active set:', cs.name);
         } else {
-          localStorage.setItem('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+          _lsSet('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
         }
       } else {
         console.log('[Sync] keeping local questions for', cs.name, '— modified after cloud sync');
@@ -3237,34 +3459,42 @@ const GDRIVE = (() => {
 
       // Apply cloud flags only if local flags haven't been modified more recently
       if(!setTs.flags || cloudSyncedAt > setTs.flags){
-        localStorage.setItem('qforge_flags_' + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []));
+        _lsSet('qforge_flags_' + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []));
       } else {
         console.log('[Sync] keeping local flags for', cs.name, '— modified after cloud sync');
       }
 
       // Apply cloud incorrect only if local incorrect hasn't been modified more recently
       if(!setTs.incorrect || cloudSyncedAt > setTs.incorrect){
-        localStorage.setItem('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
+        _lsSet('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
       } else {
         console.log('[Sync] keeping local incorrect for', cs.name, '— modified after cloud sync');
       }
 
-      if(Array.isArray(cs.srsData)) localStorage.setItem('qforge_srs_' + cs.id, JSON.stringify(cs.srsData));
+      if(Array.isArray(cs.srsData)) _lsSet('qforge_srs_' + cs.id, JSON.stringify(cs.srsData));
     });
 
-    localStorage.setItem('qforge_sets', JSON.stringify(mergedSets));
+    _lsSet('qforge_sets', JSON.stringify(mergedSets));
     console.log('[Sync] final mergedSets saved:', mergedSets.map(s=>s.id+':'+s.name));
 
     // Apply cloud grid order if newer than local
     if(Array.isArray(data.gridOrder) && data.gridOrder.length){
       const gridTs = (mergedClearTs['__grid__'] || {}).order || 0;
       if(!gridTs || cloudSyncedAt > gridTs){
-        localStorage.setItem('qforge_grid_order', JSON.stringify(data.gridOrder));
+        _lsSet('qforge_grid_order', JSON.stringify(data.gridOrder));
         console.log('[Sync] applied cloud grid order');
       } else {
         console.log('[Sync] keeping local grid order — modified after cloud sync');
       }
     }
+
+    // Prune IndexedDB images that are no longer referenced by any question
+    const allLiveRefs = new Set();
+    mergedSets.forEach(s => {
+      loadQs(s.id).forEach(q => { if(q.imageRef) allLiveRefs.add(q.imageRef); });
+    });
+    await ImageStore.pruneExcept(allLiveRefs);
+    console.log('[Sync] IndexedDB image prune complete — live refs:', allLiveRefs.size);
   }
 
   // ── Main sync — pull then push merged result ──
@@ -3281,12 +3511,12 @@ const GDRIVE = (() => {
       // 2. Pull cloud → merge into local
       if(_fileId){
         const cloudData = await _readFile(_fileId);
-        _applyPayload(cloudData);
+        await _applyPayload(cloudData);
         try{ renderSetsGrid(); } catch(e){}
       }
 
-      // 3. Push merged local state back to cloud
-      const payload = _buildPayload();
+      // 3. Push merged local state back to cloud (now async — bundles images)
+      const payload = await _buildPayload();
       const result  = await _writeFile(_fileId, payload);
       if(!_fileId && result && result.id) _fileId = result.id;
 
