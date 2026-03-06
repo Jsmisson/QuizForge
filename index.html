@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%230a0c12'/><text x='96' y='130' font-size='110' text-anchor='middle' font-family='sans-serif' fill='%2300e5ff'>Q</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;500;700;800&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root {
   --bg:#0a0c12; --surface:#111520; --surface2:#181d2e; --border:#252d45;
@@ -406,6 +407,31 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   transform:translateX(-50%);background:var(--surface);border:1px solid var(--orange);
   border-radius:20px;padding:6px 14px;font-size:.72rem;color:var(--orange);
   font-weight:600;z-index:200;white-space:nowrap}
+
+/* ══ GOOGLE DRIVE SYNC ══ */
+#syncBar{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:14px;font-size:.78rem;flex-wrap:wrap}
+#syncBar.hidden{display:none}
+.sync-avatar{width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.sync-name{color:var(--text);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-status{font-size:.7rem;color:var(--muted);white-space:nowrap}
+.sync-status.ok{color:var(--green)}
+.sync-status.err{color:var(--red)}
+.sync-status.busy{color:var(--accent)}
+#syncSignInBtn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 14px;font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;
+  color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:border-color .18s;white-space:nowrap}
+#syncSignInBtn:hover{border-color:var(--accent);color:var(--accent)}
+#syncSignInBtn svg{flex-shrink:0}
+
+/* ══ SPACED REPETITION (SRS) ══ */
+.srs-due-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;
+  border-radius:10px;text-transform:uppercase;letter-spacing:.5px;
+  background:rgba(255,145,0,.15);color:var(--orange);
+  border:1px solid rgba(255,145,0,.35);margin-top:5px}
+.srs-info{font-size:.68rem;color:var(--muted);margin-top:3px}
 </style>
 </head>
 <body>
@@ -413,6 +439,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 
   <!-- OFFLINE BADGE -->
   <div id="offlineBadge">⚠ Offline</div>
+
+  <!-- GOOGLE DRIVE SYNC BAR (injected by JS once DOM ready) -->
+  <div id="syncBarWrap"></div>
 
   <!-- INSTALL BANNER -->
   <div id="installBanner">
@@ -772,6 +801,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <option value="definition">Definition</option>
       </select>
     </div>
+
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Spaced Repetition</div>
+    <div class="settings-row"><div><div class="s-lbl">📅 Due Today Only</div><div class="s-desc">SM-2 spaced repetition — only show cards due for review</div></div><label class="toggle"><input type="checkbox" id="settSRSOnly"><span class="toggle-slider"></span></label></div>
 
     <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Timers</div>
     <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
@@ -1180,10 +1212,12 @@ function renderSetsGrid(){
     } else {
       const s=sets.find(x=>x.id===item.id); if(!s) return;
       const qs=loadQs(s.id)||[], isActive=s.id===activeSetId;
+      const due=getSRSDueCount(s.id);
       html+=`<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
         <div class="set-card-name">${esc(s.name)}</div>
         <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
         ${isActive?'<span class="set-card-badge">Active</span>':''}
+        ${due>0?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
       </div>`;
     }
   });
@@ -1205,10 +1239,12 @@ function openFolder(folderId){
 
   sets.forEach(s=>{
     const qs=loadQs(s.id)||[], isActive=s.id===activeSetId;
+    const due=getSRSDueCount(s.id);
     html+=`<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
       <div class="set-card-name">${esc(s.name)}</div>
       <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
       ${isActive?'<span class="set-card-badge">Active</span>':''}
+      ${due>0?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
     </div>`;
   });
 
@@ -1926,6 +1962,11 @@ function startQuiz(){
   let pool=[...questions];
   if(document.getElementById('settFlaggedOnly').checked) pool=pool.filter(isFlagged);
   if(document.getElementById('settCardsOnly').checked) pool=pool.filter(q=>q.type==='card');
+  if(document.getElementById('settSRSOnly') && document.getElementById('settSRSOnly').checked){
+    const due=getDueQuestions(activeSetId,pool);
+    if(!due.length){ alert('🎉 Nothing due for review! All caught up.'); return; }
+    pool=due;
+  }
   if(!pool.length) return alert('No questions to quiz!');
   if(document.getElementById('settShuffle').checked) pool.sort(()=>Math.random()-.5);
   const limit=parseInt(document.getElementById('settQLimit').value)||0;
@@ -2494,6 +2535,313 @@ if(document.readyState === 'loading'){
 } else {
   init();
 }
+
+// ═══════════════════════════════════════════════════
+//  SPACED REPETITION (SM-2)
+// ═══════════════════════════════════════════════════
+function loadSRS(id){ return JSON.parse(localStorage.getItem('qforge_srs_'+id)||'[]'); }
+function saveSRS(id,arr){ localStorage.setItem('qforge_srs_'+id,JSON.stringify(arr)); }
+function srsKey(q){ return q.type==='card'?'card:'+q.term.trim():q.text.trim(); }
+
+function updateSRS(setId, q, isCorrect){
+  const arr = loadSRS(setId);
+  const key = srsKey(q);
+  let item = arr.find(x => x.key === key);
+  if(!item){ item = {key, interval:1, ease:2.5, reps:0, due:Date.now()}; arr.push(item); }
+  const quality = isCorrect ? 4 : 1;
+  if(!isCorrect){
+    item.reps = 0;
+    item.interval = 1;
+  } else {
+    if(item.reps === 0)      item.interval = 1;
+    else if(item.reps === 1) item.interval = 6;
+    else item.interval = Math.round(item.interval * item.ease);
+    item.reps++;
+  }
+  item.ease = Math.max(1.3, item.ease + 0.1 - (5 - quality) * 0.08);
+  item.due  = Date.now() + item.interval * 86400000;
+  saveSRS(setId, arr);
+}
+
+function getDueQuestions(setId, allQuestions){
+  const arr = loadSRS(setId);
+  const now = Date.now();
+  return allQuestions.filter(q => {
+    const item = arr.find(x => x.key === srsKey(q));
+    return !item || item.due <= now;
+  });
+}
+
+function getSRSDueCount(setId){
+  const qs = loadQs(setId);
+  return getDueQuestions(setId, qs).length;
+}
+
+function getSRSInfo(setId, q){
+  const arr = loadSRS(setId);
+  return arr.find(x => x.key === srsKey(q)) || null;
+}
+
+// Patch markCorrect/markIncorrect to update SRS
+const _origMarkCorrect = window.markCorrect;
+window.markCorrect = function(q){
+  _origMarkCorrect(q);
+  updateSRS(activeSetId, q, true);
+};
+const _origMarkIncorrect = window.markIncorrect;
+window.markIncorrect = function(q){
+  _origMarkIncorrect(q);
+  updateSRS(activeSetId, q, false);
+};
+
+// ═══════════════════════════════════════════════════
+//  GOOGLE DRIVE SYNC
+//  Replace QUIZFORGE_CLIENT_ID with your OAuth client ID
+//  from console.cloud.google.com
+// ═══════════════════════════════════════════════════
+const GDRIVE = (() => {
+  const CLIENT_ID   = '752845259407-e44vv7b61ct0549hvhsc9guu7vd2dscb.apps.googleusercontent.com';
+  const SCOPE       = 'https://www.googleapis.com/auth/drive.appdata';
+  const FILE_NAME   = 'quizforge-sync.json';
+  const MIME        = 'application/json';
+
+  let _token = null;
+  let _fileId = null;
+  let _syncTimeout = null;
+  let _userProfile = null;
+
+  // ── UI helpers ──
+  function _renderBar(){
+    const wrap = document.getElementById('syncBarWrap');
+    if(!wrap) return;
+    if(!_token){
+      wrap.innerHTML = `
+        <div style="margin-bottom:14px">
+          <button id="syncSignInBtn" onclick="GDRIVE.signIn()">
+            <svg width="16" height="16" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Sign in with Google to sync
+          </button>
+        </div>`;
+    } else {
+      const name = _userProfile ? _userProfile.name : 'Signed in';
+      const pic  = _userProfile ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer">` : '';
+      wrap.innerHTML = `
+        <div id="syncBar">
+          ${pic}
+          <span class="sync-name">${name}</span>
+          <span class="sync-status" id="syncStatus">●&nbsp;Ready</span>
+          <button class="btn btn-ghost btn-sm" onclick="GDRIVE.syncNow()" style="padding:5px 10px;font-size:.7rem">↑↓ Sync</button>
+          <button class="btn btn-ghost btn-sm" onclick="GDRIVE.signOut()" style="padding:5px 10px;font-size:.7rem;color:var(--muted)">Sign out</button>
+        </div>`;
+    }
+  }
+
+  function _setStatus(msg, type=''){
+    const el = document.getElementById('syncStatus');
+    if(!el) return;
+    el.textContent = '● ' + msg;
+    el.className = 'sync-status' + (type ? ' ' + type : '');
+  }
+
+  // ── Auth ──
+  function signIn(){
+    if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID'){
+      alert('Google Drive sync needs a Client ID.\nSee the setup guide at the top of the sync section in index.html.');
+      return;
+    }
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPE,
+      callback: async (resp) => {
+        if(resp.error){ console.error('GIS error', resp); return; }
+        _token = resp.access_token;
+        localStorage.setItem('qforge_gdrive_token', _token);
+        await _fetchProfile();
+        _renderBar();
+        await syncNow();
+      }
+    });
+    client.requestAccessToken();
+  }
+
+  function signOut(){
+    if(_token) google.accounts.oauth2.revoke(_token, () => {});
+    _token = null; _fileId = null; _userProfile = null;
+    localStorage.removeItem('qforge_gdrive_token');
+    _renderBar();
+  }
+
+  async function _fetchProfile(){
+    try{
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + _token }
+      });
+      _userProfile = await r.json();
+    } catch(e){ _userProfile = null; }
+  }
+
+  // ── Drive file helpers (appDataFolder — private to this app) ──
+  async function _findFile(){
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id)`,
+      { headers: { Authorization: 'Bearer ' + _token } }
+    );
+    const d = await r.json();
+    return (d.files && d.files.length) ? d.files[0].id : null;
+  }
+
+  async function _readFile(id){
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+      { headers: { Authorization: 'Bearer ' + _token } }
+    );
+    return r.json();
+  }
+
+  async function _writeFile(id, payload){
+    const body = JSON.stringify(payload);
+    const url = id
+      ? `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`
+      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    if(id){
+      return fetch(url, { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type':MIME }, body });
+    }
+    // Create new file in appDataFolder
+    const meta = JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] });
+    const form = new FormData();
+    form.append('metadata', new Blob([meta], { type:'application/json' }));
+    form.append('file',     new Blob([body],  { type: MIME }));
+    const r = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+      { method:'POST', headers:{ Authorization:'Bearer '+_token }, body: form }
+    );
+    const d = await r.json();
+    return d;
+  }
+
+  // ── Build full backup payload (mirrors exportFullBackup) ──
+  function _buildPayload(){
+    const sets = loadSets(), folders = loadFolders();
+    return {
+      type: 'fullbackup', version: 4,
+      synced: new Date().toISOString(),
+      folders,
+      sets: sets.map(s => ({
+        id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
+        questions:          loadQs(s.id),
+        flaggedKeys:        loadFlags(s.id),
+        incorrectTracking:  loadIncorrect(s.id),
+        srsData:            loadSRS(s.id)
+      }))
+    };
+  }
+
+  // ── Restore from cloud payload (mirrors importFullBackup, non-destructive merge) ──
+  function _applyPayload(data){
+    if(!data || !Array.isArray(data.sets)) return;
+
+    const localSets    = loadSets();
+    const localFolders = loadFolders();
+    const localIds     = new Set(localSets.map(s => s.id));
+
+    // Merge folders
+    const mergedFolders = [...localFolders];
+    (data.folders || []).forEach(cf => {
+      if(!mergedFolders.find(f => f.id === cf.id)) mergedFolders.push(cf);
+    });
+    saveFolders(mergedFolders);
+
+    // Merge sets — cloud wins for existing IDs, add new ones
+    const mergedSets = [...localSets];
+    data.sets.forEach(cs => {
+      if(localIds.has(cs.id)){
+        // Update metadata; questions are merged by timestamp below
+        const ls = mergedSets.find(s => s.id === cs.id);
+        if(ls){ ls.name = cs.name; ls.folderId = cs.folderId; }
+      } else {
+        mergedSets.push({ id: cs.id, name: cs.name, folderId: cs.folderId || null, created: cs.created || Date.now() });
+      }
+      // Always write questions/flags/incorrect from cloud for that set
+      // (last-write-wins per set — simple and reliable)
+      saveQs(cs.id, Array.isArray(cs.questions) ? cs.questions : []);
+      saveFlags(cs.id, Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []);
+      if(Array.isArray(cs.incorrectTracking)) saveIncorrect(cs.id, cs.incorrectTracking);
+      if(Array.isArray(cs.srsData)) saveSRS(cs.id, cs.srsData);
+    });
+    saveSets(mergedSets);
+  }
+
+  // ── Main sync ──
+  async function syncNow(){
+    if(!_token){ return; }
+    _setStatus('Syncing…', 'busy');
+    try{
+      // 1. Find or create cloud file
+      if(!_fileId) _fileId = await _findFile();
+
+      // 2. Pull cloud data and merge locally
+      if(_fileId){
+        const cloudData = await _readFile(_fileId);
+        _applyPayload(cloudData);
+        try{ renderSetsGrid(); } catch(e){}
+      }
+
+      // 3. Push merged local state back up
+      const payload = _buildPayload();
+      const result  = await _writeFile(_fileId, payload);
+      if(!_fileId && result && result.id) _fileId = result.id;
+
+      const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      _setStatus('Synced ' + t, 'ok');
+      localStorage.setItem('qforge_gdrive_lastSync', Date.now());
+    } catch(e){
+      console.error('Drive sync error', e);
+      _setStatus('Sync failed', 'err');
+    }
+  }
+
+  // ── Auto-sync: debounce writes so rapid edits don't flood Drive ──
+  function scheduleSync(){
+    if(!_token) return;
+    clearTimeout(_syncTimeout);
+    _syncTimeout = setTimeout(syncNow, 4000); // 4s after last change
+  }
+
+  // ── Patch save functions to trigger auto-sync ──
+  const _origSaveSets = window.saveSets;
+  window.saveSets = function(s){ _origSaveSets(s); scheduleSync(); };
+  const _origSaveQs = window.saveQs;
+  window.saveQs = function(id, qs){ _origSaveQs(id, qs); scheduleSync(); };
+  const _origSaveFlags = window.saveFlags;
+  window.saveFlags = function(id, fl){ _origSaveFlags(id, fl); scheduleSync(); };
+
+  // ── Init: restore token from storage and render bar ──
+  async function initSync(){
+    const saved = localStorage.getItem('qforge_gdrive_token');
+    if(saved){
+      _token = saved;
+      await _fetchProfile();
+      _renderBar();
+      syncNow(); // sync on load if already signed in
+    } else {
+      _renderBar();
+    }
+  }
+
+  return { signIn, signOut, syncNow, initSync };
+})();
+
+// Kick off sync init after app init
+const _origInit = window.init;
+window.init = function(){
+  _origInit();
+  GDRIVE.initSync();
+};
 </script>
 </body>
 </html>
