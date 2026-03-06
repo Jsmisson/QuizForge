@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.93</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.94</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -3481,7 +3481,9 @@ const GDRIVE = (() => {
       } else if(typeof activeSetId !== 'undefined' && cs.id === activeSetId){
         console.log('[Sync] skipping question overwrite for active set:', cs.name);
       } else {
-        _lsSet('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+        // Use saveQs (not _lsSet directly) so any inline q.image blobs from old
+        // desktop payloads are stripped into ImageStore before hitting localStorage
+        saveQs(cs.id, Array.isArray(cs.questions) ? cs.questions : []);
         console.log('[Sync] applied cloud questions for', cs.name, '(', (cs.questions||[]).length, 'items )');
       }
 
