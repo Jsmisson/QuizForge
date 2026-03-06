@@ -99,10 +99,9 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .view.active{display:block}
 
 /* ══ SETS DASHBOARD ══ */
-.sets-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px}
-.sets-header-text h2{font-size:1rem;font-weight:700;margin-bottom:3px}
-.sets-header-text p{font-size:.78rem;color:var(--muted)}
-.sets-header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sets-header{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:18px;gap:12px}
+.sets-header h2{font-size:1.1rem;font-weight:700}
+.sets-header-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .sets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px;width:100%}
 .set-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
   padding:18px;cursor:pointer;transition:all .18s;position:relative;min-height:100px}
@@ -223,7 +222,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 body.modal-open{overflow:hidden;position:fixed;width:100%}
 .modal-handle{width:48px;height:5px;background:var(--border);border-radius:3px;margin:0 auto 16px;display:block;touch-action:none;cursor:grab}
-.modal-handle-zone{display:block;width:100%;padding:12px 0 4px;margin:-24px -20px 0;text-align:center;touch-action:none;cursor:grab}
+.modal-handle-zone{display:block;width:calc(100% + 40px);margin:-24px -20px 0;padding:12px 0 4px;text-align:center;touch-action:none;cursor:grab}
 .modal-handle-zone .modal-handle{margin:0 auto}
 @media(min-width:600px){.modal-handle-zone{display:none}}
 .modal-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:18px}
@@ -482,7 +481,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <div class="sets-header-actions">
         <div style="position:relative;display:inline-block">
           <button class="btn btn-ghost btn-sm" onclick="toggleHomeMenu(event)">⚙ Menu</button>
-          <div id="homeMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:170px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+          <div id="homeMenu" style="display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:170px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
             <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openOrganizeModal()">⠿ Organize</button>
             <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openBackupModal()">📦 Backup</button>
           </div>
@@ -775,7 +774,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
       <button class="btn btn-ghost-green" style="width:100%" onclick="closeExitQuizModal();showPartialResults()">📊 Save &amp; See Results</button>
-      <button class="btn btn-danger" style="width:100%" onclick="closeExitQuizModal();endQuiz()">✕ Exit Without Saving</button>
+      <button class="btn btn-danger" style="width:100%" onclick="closeExitQuizModal();endQuiz()">✕ Exit Without Results</button>
       <button class="btn btn-ghost" style="width:100%" onclick="closeExitQuizModal()">↩ Keep Going</button>
     </div>
   </div>
@@ -1713,6 +1712,29 @@ function exportCurrentSet(){
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
 function openPreQuizModal(){
+  // If no set is loaded, show a set picker instead of question count
+  if(!activeSetId){
+    const sets = loadSets().filter(s => loadQs(s.id).length > 0);
+    if(!sets.length){
+      document.getElementById('preQuizSummary').innerHTML =
+        `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;color:var(--muted)">No sets with questions yet. Add questions to a set first.</div>`;
+    } else {
+      document.getElementById('preQuizSummary').innerHTML =
+        `<div style="margin-bottom:4px">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Select a Set</div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto">
+            ${sets.map(s=>`
+              <button onclick="pickSetForQuiz('${s.id}')" style="text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                <span style="font-weight:600">${esc(s.name)}</span>
+                <span style="color:var(--muted);font-size:.75rem;margin-left:8px">${loadQs(s.id).length} questions</span>
+              </button>`).join('')}
+          </div>
+        </div>`;
+    }
+    modalOpen('preQuizModal');
+    _updateSoundToggle();
+    return;
+  }
   const flaggedOnly = document.getElementById('settFlaggedOnly').checked;
   const limit = parseInt(document.getElementById('settQLimit').value)||0;
   let pool = questions;
@@ -1726,6 +1748,18 @@ function openPreQuizModal(){
     `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:${color}">${label}</div>`;
   modalOpen('preQuizModal');
   _updateSoundToggle();
+}
+function pickSetForQuiz(id){
+  const set = loadSets().find(s => s.id === id);
+  if(!set) return;
+  activeSetId = id;
+  questions = loadQs(id);
+  flaggedKeys = loadFlags(id);
+  // Update breadcrumb name if visible
+  const bc = document.getElementById('bcSetName');
+  if(bc) bc.textContent = set.name;
+  // Re-render summary with the chosen set
+  openPreQuizModal();
 }
 function closePreQuizModal(e){
   if(e&&e.target!==document.getElementById('preQuizModal')) return;
