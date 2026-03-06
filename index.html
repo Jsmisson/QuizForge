@@ -2770,6 +2770,7 @@ function toggleDueBadges(){
   if(el) el.checked = dueBadgesEnabled();
   renderSetsGrid();
 }
+function soundEnabled(){
   return localStorage.getItem('qforge_sound') !== 'off';
 }
 function toggleSound(){
