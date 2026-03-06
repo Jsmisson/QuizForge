@@ -326,6 +326,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 .quiz-footer-hint{font-size:.75rem;color:var(--muted)}
 .submit-btn{flex:1;max-width:220px;padding:14px 20px;font-size:.88rem}
 @media(max-width:400px){.submit-btn{max-width:none;width:100%}}
+.hotkey-legend{display:none;flex-wrap:wrap;gap:6px 12px;padding:8px 0 2px;border-top:1px solid var(--border);margin-top:6px}
+@media(hover:hover) and (pointer:fine){.hotkey-legend{display:flex}}
+.hk{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;color:var(--muted)}
+.hk kbd{background:var(--surface2);border:1px solid var(--border);border-radius:5px;
+  padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--text);
+  box-shadow:0 1px 0 var(--border)}
 
 /* ══ RESULTS ══ */
 .results-card{text-align:center;padding:32px 20px}
@@ -346,6 +352,18 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 .flagged-q .fq-q{font-size:.86rem;margin-bottom:5px;line-height:1.4}
 .flagged-q .fq-a{font-size:.76rem;color:var(--green)}
 .flagged-q .fq-e{font-size:.73rem;color:var(--muted);margin-top:4px}
+/* ══ INCORRECT REVIEW ══ */
+.review-section{text-align:left;margin-top:20px}
+.review-section-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--red);margin-bottom:10px}
+.review-q{background:var(--surface2);border:1px solid rgba(255,82,82,.2);border-radius:10px;padding:14px;margin-bottom:8px}
+.review-q-text{font-size:.86rem;font-weight:600;margin-bottom:10px;line-height:1.4}
+.review-opt{font-size:.78rem;padding:7px 10px;border-radius:7px;margin-bottom:5px;line-height:1.4;display:flex;align-items:flex-start;gap:8px}
+.review-opt.given-wrong{background:rgba(255,82,82,.12);border:1px solid rgba(255,82,82,.3);color:var(--red)}
+.review-opt.correct-ans{background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:var(--green)}
+.review-opt.neutral{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.review-opt-icon{font-size:.8rem;flex-shrink:0;margin-top:1px}
+.review-card-def{font-size:.78rem;color:var(--muted);margin-top:4px;padding:6px 10px;background:var(--surface);border-radius:6px;border:1px solid var(--border)}
+.review-explain{font-size:.72rem;color:var(--muted);margin-top:6px;font-style:italic}
 
 /* ══ SETTINGS ══ */
 .settings-row{display:flex;align-items:center;justify-content:space-between;
@@ -571,7 +589,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
           <div class="progress-label"><span id="progressLabel">Q 1 of 10</span><span id="progressPct">0%</span></div>
           <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center">
+        <div id="scoreBadgeWrap" style="display:flex;gap:6px;align-items:center">
           <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
           <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
         </div>
@@ -606,6 +624,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <span class="quiz-footer-hint" id="selHint"></span>
         <button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>
       </div>
+      <div class="hotkey-legend" id="hotkeyLegend">
+        <span class="hk"><kbd>1</kbd>–<kbd>9</kbd> Select answer</span>
+        <span class="hk"><kbd>Space</kbd> Submit / Next</span>
+        <span class="hk"><kbd>F</kbd> Flag</span>
+        <span class="hk"><kbd>Esc</kbd> Exit</span>
+      </div>
     </div>
 
     <!-- RESULTS -->
@@ -623,8 +647,13 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <div class="result-actions">
           <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
           <button class="btn btn-ghost-red" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none">❌ Review</button>
+          <button class="btn btn-ghost-red" id="viewIncorrectBtn" onclick="toggleIncorrectReview()" style="display:none">📋 View Incorrect</button>
           <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
           <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
+        </div>
+        <div id="incorrectReviewSection" class="review-section" style="display:none">
+          <div class="review-section-title">✗ Incorrect Answers</div>
+          <div id="incorrectReviewList"></div>
         </div>
         <div id="flaggedSection" style="display:none" class="flagged-section">
           <div class="flagged-section-title">🚩 Flagged for Review</div>
@@ -1900,7 +1929,7 @@ function startQuiz(){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,answerLog:[],savedAnswers:{}};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
@@ -1941,9 +1970,18 @@ function onTimeout(){
 function renderQuestion(){
   answered=false; quiz.selected=[];
   const q=quiz.questions[quiz.idx], total=quiz.questions.length, pct=Math.round((quiz.idx/total)*100);
+  const freeNav=isFreeNav();
+  // Restore saved answer for this question if navigating back
+  const saved=(quiz.savedAnswers||{})[quiz.idx];
+  if(saved && freeNav){
+    if(saved.selected) quiz.selected=[...saved.selected];
+  }
   document.getElementById('progressLabel').textContent=`Q ${quiz.idx+1} of ${total}`;
   document.getElementById('progressPct').textContent=pct+'%';
   document.getElementById('progressFill').style.width=pct+'%';
+  const feedbackOn=document.getElementById('settFeedback').checked;
+  const scoreBadges=document.getElementById('scoreBadgeWrap');
+  if(scoreBadges) scoreBadges.style.display=feedbackOn?'flex':'none';
   document.getElementById('scoreDisplay').textContent=quiz.score;
   document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   const fl=isFlagged(q), fb=document.getElementById('flagBtn');
@@ -1952,7 +1990,6 @@ function renderQuestion(){
   const feedEl=document.getElementById('feedbackBox'); feedEl.className='feedback-box'; feedEl.style.display='none';
 
   if(q.type==='card'){
-    // Flashcard mode
     const showFirst=document.getElementById('settCardFirst').value||'term';
     const frontText=showFirst==='term'?q.term:q.definition;
     const backText=showFirst==='term'?q.definition:q.term;
@@ -1961,9 +1998,11 @@ function renderQuestion(){
     document.getElementById('questionText').textContent='';
     const qImg=document.getElementById('questionImg'); qImg.src=''; qImg.style.display='none';
     document.getElementById('questionHint').style.display='none';
+    // If previously answered this card, show pre-flipped with result
+    const wasAnswered=saved && saved.cardResult!==undefined;
     document.getElementById('choicesList').innerHTML=`
       <div class="flip-card-wrap" onclick="flipCard(this)">
-        <div class="flip-card" id="flipCard">
+        <div class="flip-card${wasAnswered?' flipped':''}" id="flipCard">
           <div class="flip-face flip-face-front">
             <div class="flip-label">${frontLabel}</div>
             ${q.image?`<img class="flip-card-img" src="${q.image}" alt="">`:''}
@@ -1977,24 +2016,36 @@ function renderQuestion(){
           </div>
         </div>
       </div>`;
-    const sb=document.getElementById('submitBtn');
-    sb.style.display='none';
-    document.getElementById('selHint').textContent='';
-    // Show got-it / missed buttons in footer after flip
     const footer=document.querySelector('.quiz-footer');
-    footer.innerHTML=`
-      <span class="quiz-footer-hint" id="selHint"></span>
-      <button class="btn btn-primary submit-btn" id="submitBtn" style="display:none"></button>
-      <div class="flashcard-btns" id="flashcardBtns" style="display:none;width:100%">
-        <button class="btn-got-it flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(true)">✓ Got it</button>
-        <button class="btn-missed flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(false)">✗ Missed it</button>
-      </div>`;
-  } else {
-    // MC mode — restore footer if it was replaced
-    const footer=document.querySelector('.quiz-footer');
-    if(!document.getElementById('submitBtn') || document.getElementById('submitBtn').parentElement!==footer){
-      footer.innerHTML=`<span class="quiz-footer-hint" id="selHint"></span><button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>`;
+    const backBtn=freeNav&&quiz.idx>0?`<button class="btn btn-ghost" style="flex:1;max-width:120px" onclick="prevQuestion()">← Back</button>`:'';
+    if(wasAnswered){
+      // Previously answered — show re-answer buttons immediately
+      const isLast=quiz.idx>=total-1;
+      footer.innerHTML=`
+        <span class="quiz-footer-hint" id="selHint"></span>
+        <div style="display:flex;gap:8px;width:100%;flex-wrap:wrap">
+          ${backBtn}
+          <button class="btn-got-it" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(true)">✓ Got it</button>
+          <button class="btn-missed" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(false)">✗ Missed it</button>
+          <button class="btn btn-primary" style="flex:1;max-width:120px" onclick="nextQuestion()">${isLast?'Results →':'Next →'}</button>
+        </div>`;
+    } else {
+      footer.innerHTML=`
+        <span class="quiz-footer-hint" id="selHint"></span>
+        <div style="display:flex;gap:8px;width:100%">
+          ${backBtn}
+          <button class="btn btn-primary submit-btn" id="submitBtn" style="display:none"></button>
+          <div class="flashcard-btns" id="flashcardBtns" style="display:${wasAnswered?'flex':'none'};flex:1">
+            <button class="btn-got-it flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(true)">✓ Got it</button>
+            <button class="btn-missed flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(false)">✗ Missed it</button>
+          </div>
+        </div>`;
     }
+    updateHotkeyLegend(true);
+  } else {
+    // MC mode
+    const footer=document.querySelector('.quiz-footer');
+    footer.innerHTML=`<span class="quiz-footer-hint" id="selHint"></span><button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>`;
     document.getElementById('questionText').textContent=q.text;
     const qImg=document.getElementById('questionImg');
     if(q.image){ qImg.src=q.image; qImg.style.display='block'; }
@@ -2005,12 +2056,23 @@ function renderQuestion(){
     document.getElementById('selHint').textContent=q.type==='multi'?`Choose ${q.correct.length}`:'Choose 1';
     const keys='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     document.getElementById('choicesList').innerHTML=q.options.map((opt,i)=>
-      `<button class="choice-btn" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
+      `<button class="choice-btn${quiz.selected.includes(i)?' selected':''}" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
     ).join('');
     const sb=document.getElementById('submitBtn');
     sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
-    if(q.type==='multi'){ sb.disabled=true; sb.style.opacity='.45'; sb.style.cursor='not-allowed'; }
-    else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
+    if(freeNav && quiz.idx>0){
+      const backBtn=document.createElement('button');
+      backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
+      backBtn.style.cssText='flex:1;max-width:120px';
+      backBtn.onclick=prevQuestion;
+      footer.insertBefore(backBtn, sb);
+    }
+    if(q.type==='multi'){
+      const needed=q.correct.length, have=quiz.selected.length, ready=have>=needed;
+      sb.disabled=!ready; sb.style.opacity=ready?'':'0.45'; sb.style.cursor=ready?'':'not-allowed';
+      document.getElementById('selHint').textContent=ready?`${have} selected — ready!`:`Choose ${needed} (${have}/${needed} selected)`;
+    } else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
+    updateHotkeyLegend(false);
   }
   startQTimer();
 }
@@ -2025,8 +2087,30 @@ function flipCard(wrap){
 function cardAnswer(gotIt){
   if(answered) return; answered=true;
   const q=quiz.questions[quiz.idx];
-  if(gotIt){ quiz.score++; markCorrect(q); }
-  else { markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; }
+  // Save answer (overwrite if re-answering)
+  if(!quiz.savedAnswers) quiz.savedAnswers={};
+  const prevSaved=quiz.savedAnswers[quiz.idx];
+  quiz.savedAnswers[quiz.idx]={cardResult:gotIt, isCorrect:gotIt};
+  // Undo previous incorrect tracking if re-answering
+  if(prevSaved!==undefined){
+    const arr=loadIncorrect(activeSetId);
+    const key=incorrectKey(q);
+    const idx=arr.findIndex(x=>x.key===key);
+    if(idx>=0) arr.splice(idx,1);
+    saveIncorrect(activeSetId,arr);
+  }
+  if(gotIt) markCorrect(q); else markIncorrect(q);
+  // Recalculate score from savedAnswers
+  let score=0, wrongs=0;
+  Object.values(quiz.savedAnswers).forEach(a=>{ if(a.isCorrect) score++; else wrongs++; });
+  quiz.score=score; quiz.wrongs=wrongs;
+  // Update answerLog
+  if(quiz.answerLog){
+    const key=incorrectKey(q);
+    const li=quiz.answerLog.findIndex(e=>incorrectKey(e.q)===key);
+    const entry={q,selected:[],isCorrect:gotIt,isCard:true};
+    if(li>=0) quiz.answerLog[li]=entry; else quiz.answerLog.push(entry);
+  }
   document.getElementById('scoreDisplay').textContent=quiz.score;
   document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   renderHeader();
@@ -2035,9 +2119,18 @@ function cardAnswer(gotIt){
   const fbDiv=document.getElementById('flashcardBtns');
   if(fbDiv) fbDiv.style.display='none';
   const footer=document.querySelector('.quiz-footer');
+  // Clear footer and rebuild with back + next
+  footer.innerHTML='';
+  if(isFreeNav() && quiz.idx>0){
+    const backBtn=document.createElement('button');
+    backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
+    backBtn.style.cssText='flex:1;max-width:120px';
+    backBtn.onclick=prevQuestion;
+    footer.appendChild(backBtn);
+  }
   const nextBtn=document.createElement('button');
   nextBtn.className='btn btn-primary submit-btn';
-  nextBtn.style.width='100%';
+  nextBtn.style.flex='1';
   nextBtn.textContent=isLast?'See Results →':'Next →';
   nextBtn.onclick=nextQuestion;
   footer.appendChild(nextBtn);
@@ -2074,7 +2167,7 @@ function toggleChoice(i){
   }
 }
 function submitAnswer(){
-  if(answered){nextQuestion();return;}
+  if(answered) return;
   const q=quiz.questions[quiz.idx];
   if(!quiz.selected.length) return;
   if(q.type==='multi' && quiz.selected.length < q.correct.length){
@@ -2086,8 +2179,31 @@ function submitAnswer(){
   }
   clearInterval(qInterval); answered=true;
   const isCorrect=[...q.correct].sort().join(',')===[...quiz.selected].sort().join(',');
-  if(isCorrect){ quiz.score++; markCorrect(q); }
-  else { markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; }
+  // Save answer (overwrite if re-answering)
+  if(!quiz.savedAnswers) quiz.savedAnswers={};
+  const prevSaved=quiz.savedAnswers[quiz.idx];
+  quiz.savedAnswers[quiz.idx]={selected:[...quiz.selected], isCorrect};
+  // Recalculate score and wrongs from savedAnswers to avoid double-counting
+  let score=0, wrongs=0;
+  Object.values(quiz.savedAnswers).forEach(a=>{ if(a.isCorrect) score++; else wrongs++; });
+  quiz.score=score; quiz.wrongs=wrongs;
+  // Update incorrect tracking (undo previous if re-answering)
+  if(prevSaved!==undefined){
+    // Remove old tracking for this question before re-tracking
+    const arr=loadIncorrect(activeSetId);
+    const key=incorrectKey(q);
+    const idx=arr.findIndex(x=>x.key===key);
+    if(idx>=0) arr.splice(idx,1);
+    saveIncorrect(activeSetId,arr);
+  }
+  if(isCorrect) markCorrect(q); else markIncorrect(q);
+  // Update answerLog (replace entry for this question if re-answering)
+  if(quiz.answerLog){
+    const key=incorrectKey(q);
+    const li=quiz.answerLog.findIndex(e=>incorrectKey(e.q)===key);
+    const entry={q,selected:[...quiz.selected],isCorrect};
+    if(li>=0) quiz.answerLog[li]=entry; else quiz.answerLog.push(entry);
+  }
   renderHeader();
   if(document.getElementById('settFeedback').checked){
     document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
@@ -2095,11 +2211,37 @@ function submitAnswer(){
     if(isCorrect){fb.className='feedback-box show correct-fb';document.getElementById('fbTitle').textContent='✓ Correct!';}
     else{fb.className='feedback-box show wrong-fb';document.getElementById('fbTitle').textContent=`✗ Incorrect — Correct: ${q.correct.map(i=>q.options[i]).join(', ')}`;}
     document.getElementById('fbExplain').textContent=(document.getElementById('settExplain').checked&&q.explain)?q.explain:'';
+  } else {
+    document.querySelectorAll('.choice-btn').forEach(btn=>{ btn.disabled=true; });
   }
   document.getElementById('scoreDisplay').textContent=quiz.score;
   document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
-  sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
+  // Disable button immediately to prevent double-click
+  sb.disabled=true; sb.style.opacity='0.5'; sb.style.cursor='not-allowed';
+  if(isFreeNav()){
+    // Free-nav: show Next button but don't auto-advance (user may want to go back)
+    sb.textContent=isLast?'See Results →':'Next →';
+    sb.disabled=false; sb.style.opacity=''; sb.style.cursor='';
+    sb.onclick=nextQuestion;
+    // In free-nav, also add a back button after answering
+    if(quiz.idx>0 && !document.querySelector('.quiz-footer .btn-ghost')){
+      const footer=document.querySelector('.quiz-footer');
+      const backBtn=document.createElement('button');
+      backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
+      backBtn.style.cssText='flex:1;max-width:120px';
+      backBtn.onclick=prevQuestion;
+      footer.insertBefore(backBtn, footer.firstChild);
+    }
+  } else if(document.getElementById('settFeedback').checked){
+    // Feedback on: show result, require click to advance
+    sb.textContent=isLast?'See Results →':'Next →';
+    sb.disabled=false; sb.style.opacity=''; sb.style.cursor='';
+    sb.onclick=nextQuestion;
+  } else {
+    // No feedback: advance immediately
+    nextQuestion();
+  }
 }
 function quickQuiz(n){
   if(!questions.length) return alert('No questions in this set.');
@@ -2107,7 +2249,7 @@ function quickQuiz(n){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,answerLog:[],savedAnswers:{}};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
@@ -2122,14 +2264,22 @@ function startIncorrectQuiz(){
   if(document.getElementById('settShuffleOpts').checked){
     pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
-  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,isIncorrectMode:true};
+  quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,isIncorrectMode:true,answerLog:[],savedAnswers:{}};
   answered=false; overallSec=0; clearInterval(overallInterval);
   overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
   showView('quiz'); renderQuestion();
 }
 function nextQuestion(){ quiz.idx++; if(quiz.idx>=quiz.questions.length){showResults();return;} renderQuestion(); }
+function prevQuestion(){ if(quiz.idx<=0) return; quiz.idx--; renderQuestion(); }
+
+function isFreeNav(){
+  return document.getElementById('settCardsOnly').checked;
+}
 function showResults(){
   clearInterval(overallInterval); clearInterval(qInterval);
+  console.log('[QuizForge] showResults — answerLog:', JSON.stringify((quiz.answerLog||[]).map(e=>({key:incorrectKey(e.q),isCorrect:e.isCorrect}))));
+  console.log('[QuizForge] showResults — savedAnswers:', JSON.stringify(quiz.savedAnswers));
+  console.log('[QuizForge] showResults — wrongs:', quiz.wrongs, 'score:', quiz.score);
   const total=quiz.questions.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
   document.getElementById('resultScore').textContent=pct+'%';
   document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
@@ -2145,13 +2295,76 @@ function showResults(){
   const incBtn=document.getElementById('retakeIncorrectBtn');
   if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
   if(incBtn) incBtn.textContent=`❌ Review (${incCount})`;
+  // Show View Incorrect button if any wrong answers logged
+  const wrongLog=(quiz.answerLog||[]).filter(e=>!e.isCorrect);
+  // Also cross-check savedAnswers in case answerLog missed any
+  const savedWrongCount=Object.values(quiz.savedAnswers||{}).filter(a=>!a.isCorrect).length;
+  const viewBtn=document.getElementById('viewIncorrectBtn');
+  if(viewBtn){
+    const count=Math.max(wrongLog.length, savedWrongCount);
+    viewBtn.style.display=count>0?'inline-flex':'none';
+    viewBtn.textContent=`📋 View Incorrect (${wrongLog.length||savedWrongCount})`;
+  }  // Reset review panel
+  const revSec=document.getElementById('incorrectReviewSection');
+  if(revSec) revSec.style.display='none';
+  const revList=document.getElementById('incorrectReviewList');
+  if(revList) revList.innerHTML='';
   const flagged=quiz.questions.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
     sec.style.display='block';
-    document.getElementById('flaggedList').innerHTML=flagged.map(q=>`<div class="flagged-q"><div class="fq-q">${esc(q.text)}</div><div class="fq-a">✓ ${q.correct.map(i=>esc(q.options[i])).join(', ')}</div>${q.explain?`<div class="fq-e">${esc(q.explain)}</div>`:''}</div>`).join('');
+    document.getElementById('flaggedList').innerHTML=flagged.map(q=>`<div class="flagged-q"><div class="fq-q">${esc(q.text||q.term||'')}</div><div class="fq-a">✓ ${q.type==='card'?esc(q.definition):q.correct.map(i=>esc(q.options[i])).join(', ')}</div>${q.explain?`<div class="fq-e">${esc(q.explain)}</div>`:''}</div>`).join('');
   } else sec.style.display='none';
   showView('results');
+}
+function toggleIncorrectReview(){
+  const sec=document.getElementById('incorrectReviewSection');
+  const btn=document.getElementById('viewIncorrectBtn');
+  if(sec.style.display==='none'){
+    renderIncorrectReview();
+    sec.style.display='block';
+    btn.textContent=btn.textContent.replace('View','Hide');
+    sec.scrollIntoView({behavior:'smooth',block:'nearest'});
+  } else {
+    sec.style.display='none';
+    btn.textContent=btn.textContent.replace('Hide','View');
+  }
+}
+function renderIncorrectReview(){
+  // Build wrongLog from answerLog; fall back to savedAnswers if answerLog is missing entries
+  let wrongLog=(quiz.answerLog||[]).filter(e=>!e.isCorrect);
+  if(wrongLog.length===0 && quiz.savedAnswers){
+    wrongLog=Object.entries(quiz.savedAnswers)
+      .filter(([,a])=>!a.isCorrect)
+      .map(([idx,a])=>({q:quiz.questions[parseInt(idx)],selected:a.selected||[],isCorrect:false,isCard:!!(a.cardResult!==undefined)}));
+  }
+  const list=document.getElementById('incorrectReviewList');
+  if(!list) return;
+  list.innerHTML=wrongLog.map((entry,ei)=>{
+    const {q,selected,isCard}=entry;
+    if(isCard){
+      return `<div class="review-q">
+        <div class="review-q-text">🃏 ${esc(q.term)}</div>
+        <div class="review-opt given-wrong"><span class="review-opt-icon">✗</span><span>You marked: <strong>Missed it</strong></span></div>
+        <div class="review-card-def"><span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">Definition: </span>${esc(q.definition)}</div>
+        ${q.explain?`<div class="review-explain">${esc(q.explain)}</div>`:''}
+      </div>`;
+    }
+    const opts=(q.options||[]).map((opt,i)=>{
+      const wasSelected=selected.includes(i);
+      const isCorrect=q.correct.includes(i);
+      let cls='neutral', icon='';
+      if(wasSelected && !isCorrect){ cls='given-wrong'; icon='✗'; }
+      else if(isCorrect){ cls='correct-ans'; icon='✓'; }
+      else return '';
+      return `<div class="review-opt ${cls}"><span class="review-opt-icon">${icon}</span><span>${esc(opt)}</span></div>`;
+    }).join('');
+    return `<div class="review-q">
+      <div class="review-q-text">${esc(q.text||'')}</div>
+      ${opts}
+      ${q.explain?`<div class="review-explain">${esc(q.explain)}</div>`:''}
+    </div>`;
+  }).join('');
 }
 function openExitQuizModal(){
   const answered=quiz.idx; // questions attempted so far (including current if answered)
@@ -2207,6 +2420,95 @@ function showPartialResults(){
 }
 function endQuiz(){
   clearInterval(overallInterval); clearInterval(qInterval); showView('manage');
+}
+
+// ═══════════════════════════════════════════════════
+//  KEYBOARD HOTKEYS (desktop only)
+// ═══════════════════════════════════════════════════
+document.addEventListener('keydown', function(e){
+  // Only active when quiz view is shown
+  const quizView=document.getElementById('view-quiz');
+  if(!quizView || !quizView.classList.contains('active')) return;
+  // Ignore if focus is in an input/textarea
+  if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+
+  const key=e.key.toUpperCase();
+  const q=quiz && quiz.questions && quiz.questions[quiz.idx];
+  if(!q) return;
+
+  const isCard=q.type==='card';
+
+  if(isCard){
+    // Space = flip card
+    if(e.key===' '||e.key==='Enter'){
+      e.preventDefault();
+      const wrap=document.querySelector('.flip-card-wrap');
+      if(wrap){
+        const card=wrap.querySelector('.flip-card');
+        const alreadyFlipped=card.classList.contains('flipped');
+        if(!alreadyFlipped){ flipCard(wrap); }
+        else {
+          // If already flipped, Space/Enter advances like "Got it" only if answered
+          if(answered) nextQuestion();
+        }
+      }
+      return;
+    }
+    // G = got it, M = missed
+    if(key==='G'){ const fb=document.getElementById('flashcardBtns'); if(fb&&fb.style.display!=='none') cardAnswer(true); return; }
+    if(key==='M'){ const fb=document.getElementById('flashcardBtns'); if(fb&&fb.style.display!=='none') cardAnswer(false); return; }
+  } else {
+    // Number keys 1–9 or letter keys A–I = select choice
+    let choiceIdx=-1;
+    if(e.key>='1'&&e.key<='9') choiceIdx=parseInt(e.key)-1;
+    else if(key>='A'&&key<='I') choiceIdx=key.charCodeAt(0)-65;
+    if(choiceIdx>=0 && choiceIdx<(q.options||[]).length && !answered){
+      e.preventDefault();
+      toggleChoice(choiceIdx); return;
+    }
+    // Space or Enter = submit / next
+    if(e.key===' '||e.key==='Enter'){
+      e.preventDefault();
+      const sb=document.getElementById('submitBtn');
+      if(sb && !sb.disabled) sb.click();
+      return;
+    }
+  }
+
+  // F = flag (works for both types)
+  if(key==='F'){ e.preventDefault(); toggleFlag(); return; }
+
+  // Arrow keys — back/forward in free-nav mode
+  if(isFreeNav()){
+    if(e.key==='ArrowLeft' && quiz.idx>0){ e.preventDefault(); prevQuestion(); return; }
+    if(e.key==='ArrowRight'){ e.preventDefault(); nextQuestion(); return; }
+  }
+
+  // Escape = exit quiz modal
+  if(e.key==='Escape'){ e.preventDefault(); openExitQuizModal(); return; }
+});
+
+// Update hotkey legend based on question type
+function updateHotkeyLegend(isCard){
+  const el=document.getElementById('hotkeyLegend');
+  if(!el) return;
+  const nav=isFreeNav()?`<span class="hk"><kbd>←</kbd><kbd>→</kbd> Navigate</span>`:'';
+  if(isCard){
+    el.innerHTML=`
+      <span class="hk"><kbd>Space</kbd> Flip card</span>
+      <span class="hk"><kbd>G</kbd> Got it</span>
+      <span class="hk"><kbd>M</kbd> Missed it</span>
+      <span class="hk"><kbd>F</kbd> Flag</span>
+      ${nav}
+      <span class="hk"><kbd>Esc</kbd> Exit</span>`;
+  } else {
+    el.innerHTML=`
+      <span class="hk"><kbd>1</kbd>–<kbd>9</kbd> Select answer</span>
+      <span class="hk"><kbd>Space</kbd> Submit / Next</span>
+      <span class="hk"><kbd>F</kbd> Flag</span>
+      ${nav}
+      <span class="hk"><kbd>Esc</kbd> Exit</span>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════
