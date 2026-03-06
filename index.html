@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.97</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.98</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -2418,8 +2418,7 @@ function renderQuestion(){
   answered=false; quiz.selected=[];
   const q=quiz.questions[quiz.idx], total=quiz.questions.length, pct=Math.round((quiz.idx/total)*100);
   const freeNav=isFreeNav();
-  // Restore saved answer for this question if navigating back
-  // Only restore if there's an actual selection (not a timeout with empty selected)
+  // Restore saved answer for this question if navigating back (MC: re-selects choices, card: shows flipped state)
   const saved=(quiz.savedAnswers||{})[quiz.idx];
   const hasRealAnswer = saved && (
     (saved.selected && saved.selected.length > 0) ||
@@ -2427,7 +2426,8 @@ function renderQuestion(){
   );
   if(hasRealAnswer && freeNav){
     if(saved.selected) quiz.selected=[...saved.selected];
-    answered = true; // mark as already answered so submit btn shows Next, not Submit
+    // Note: answered stays false for MC so user can change and re-submit
+    // Cards handle their own answered state via wasAnswered below
   }
   document.getElementById('progressLabel').textContent=`Q ${quiz.idx+1} of ${total}`;
   document.getElementById('progressPct').textContent=pct+'%';
@@ -2521,31 +2521,19 @@ function renderQuestion(){
       `<button class="choice-btn${quiz.selected.includes(i)?' selected':''}" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
     ).join('');
     const sb=document.getElementById('submitBtn');
-    // If already answered (e.g. navigating back with freeNav), show result state
-    if(answered && hasRealAnswer){
-      document.querySelectorAll('.choice-btn').forEach((btn,i)=>{
-        btn.disabled=true;
-        if(q.correct.includes(i)) btn.classList.add('correct');
-        else if(quiz.selected.includes(i)) btn.classList.add('wrong');
-      });
-      const isLast=quiz.idx>=quiz.questions.length-1;
-      sb.style.display=''; sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
-      sb.disabled=false; sb.style.opacity=''; sb.style.cursor='';
-    } else {
-      sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
-      if(freeNav && quiz.idx>0){
-        const backBtn=document.createElement('button');
-        backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
-        backBtn.style.cssText='flex:1;max-width:120px';
-        backBtn.onclick=prevQuestion;
-        footer.insertBefore(backBtn, sb);
-      }
-      if(q.type==='multi'){
-        const needed=q.correct.length, have=quiz.selected.length, ready=have>=needed;
-        sb.disabled=!ready; sb.style.opacity=ready?'':'0.45'; sb.style.cursor=ready?'':'not-allowed';
-        document.getElementById('selHint').textContent=ready?`${have} selected — ready!`:`Choose ${needed} (${have}/${needed} selected)`;
-      } else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
+    sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
+    if(freeNav && quiz.idx>0){
+      const backBtn=document.createElement('button');
+      backBtn.className='btn btn-ghost'; backBtn.textContent='← Back';
+      backBtn.style.cssText='flex:1;max-width:120px';
+      backBtn.onclick=prevQuestion;
+      footer.insertBefore(backBtn, sb);
     }
+    if(q.type==='multi'){
+      const needed=q.correct.length, have=quiz.selected.length, ready=have>=needed;
+      sb.disabled=!ready; sb.style.opacity=ready?'':'0.45'; sb.style.cursor=ready?'':'not-allowed';
+      document.getElementById('selHint').textContent=ready?`${have} selected — ready!`:`Choose ${needed} (${have}/${needed} selected)`;
+    } else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
     updateHotkeyLegend(false);
   }
   startQTimer();
