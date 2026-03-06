@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.96</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.97</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -2419,8 +2419,13 @@ function renderQuestion(){
   const q=quiz.questions[quiz.idx], total=quiz.questions.length, pct=Math.round((quiz.idx/total)*100);
   const freeNav=isFreeNav();
   // Restore saved answer for this question if navigating back
+  // Only restore if there's an actual selection (not a timeout with empty selected)
   const saved=(quiz.savedAnswers||{})[quiz.idx];
-  if(saved && freeNav){
+  const hasRealAnswer = saved && (
+    (saved.selected && saved.selected.length > 0) ||
+    (saved.cardResult !== undefined)
+  );
+  if(hasRealAnswer && freeNav){
     if(saved.selected) quiz.selected=[...saved.selected];
     answered = true; // mark as already answered so submit btn shows Next, not Submit
   }
@@ -2517,7 +2522,7 @@ function renderQuestion(){
     ).join('');
     const sb=document.getElementById('submitBtn');
     // If already answered (e.g. navigating back with freeNav), show result state
-    if(answered && saved){
+    if(answered && hasRealAnswer){
       document.querySelectorAll('.choice-btn').forEach((btn,i)=>{
         btn.disabled=true;
         if(q.correct.includes(i)) btn.classList.add('correct');
@@ -3560,7 +3565,9 @@ const GDRIVE = (() => {
     if(Array.isArray(data.gridOrder) && data.gridOrder.length){
       const localGridTs = (localClearTs['__grid__'] || {}).order || 0;
       if(localGridTs <= lastLocalSync){
+        // Write directly (bypass scheduleSync patch to avoid sync loop)
         _lsSet('qforge_grid_order', JSON.stringify(data.gridOrder));
+        recordModified('__grid__', 'order');
         console.log('[Sync] applied cloud grid order');
       } else {
         console.log('[Sync] keeping local grid order — modified after cloud sync');
@@ -3643,6 +3650,9 @@ const GDRIVE = (() => {
   // Tombstones must also trigger sync — deleteSet calls saveTombstones before saveSets
   const _origSaveTombstones = window.saveTombstones;
   window.saveTombstones = function(t){ _origSaveTombstones(t); scheduleSync(); };
+  // Grid order must sync — dragging sets to reorder should push to Drive
+  const _origSaveGridOrder = window.saveGridOrder;
+  window.saveGridOrder = function(o){ _origSaveGridOrder(o); scheduleSync(); };
 
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
