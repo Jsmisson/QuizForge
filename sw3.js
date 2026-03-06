@@ -1,4 +1,4 @@
-const CACHE = 'quizforge-v4';
+const CACHE = 'quizforge-v5';
 const ASSETS = ['./index.html', './manifest.json', './sw3.js'];
 
 self.addEventListener('install', e => {
@@ -21,6 +21,14 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  const url = e.request.url;
+
+  // Never intercept Google API calls — PATCH/POST to googleapis must go straight to network
+  if (url.includes('googleapis.com') || url.includes('accounts.google.com')) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
   // Network first for navigations; cache first for everything else
   if (e.request.mode === 'navigate') {
     e.respondWith(
