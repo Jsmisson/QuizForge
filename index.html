@@ -486,6 +486,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
             <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openBackupModal()">📦 Backup</button>
           </div>
         </div>
+        <button class="btn btn-ghost btn-sm" onclick="openQuick10Modal()">⚡ Quick 10</button>
         <button class="btn btn-primary btn-sm" onclick="openQuizOptsModal()">▶ Quiz</button>
       </div>
     </div>
@@ -865,6 +866,25 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <div style="font-size:.75rem;color:var(--red)">⚠ Replaces ALL current data</div>
         <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" onchange="closeBackupModal();importFullBackup(event)">
       </label>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK 10 MODAL -->
+<div class="modal-overlay" id="quick10Modal" style="display:none" onclick="if(event.target===this)closeQuick10Modal()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">⚡ Quick 10</div>
+    <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px">10 random questions, shuffled — no setup needed.</div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Set</div>
+    <div id="quick10SetList" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px"></div>
+
+    <div class="settings-row" style="margin-bottom:0"><div><div class="s-lbl">Sound Effects</div></div><label class="toggle"><input type="checkbox" id="quick10Sound" onchange="localStorage.setItem('qforge_sound',this.checked?'on':'off')"><span class="toggle-slider"></span></label></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeQuick10Modal()">Cancel</button>
+      <button class="btn btn-primary" style="padding:12px 28px" onclick="startQuick10()">⚡ Go</button>
     </div>
   </div>
 </div>
@@ -1773,6 +1793,43 @@ function openImportExportModal(){
 function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
   modalClose('importExportModal');
+}
+function openQuick10Modal(){
+  const sets = loadSets().filter(s => loadQs(s.id).length > 0);
+  const list = document.getElementById('quick10SetList');
+  // Pre-select active set if one is loaded
+  let selectedId = activeSetId || (sets.length ? sets[0].id : null);
+  function render(){
+    list.innerHTML = sets.map(s => `
+      <button onclick="q10Select('${s.id}')" id="q10btn_${s.id}" style="text-align:left;background:var(--surface2);border:2px solid ${s.id===selectedId?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;transition:border-color .15s;width:100%">
+        <span style="font-weight:600">${esc(s.name)}</span>
+        <span style="color:var(--muted);font-size:.75rem;margin-left:8px">${loadQs(s.id).length} questions</span>
+      </button>`).join('');
+    list._selectedId = selectedId;
+  }
+  window.q10Select = id => { selectedId = id; render(); };
+  if(!sets.length){
+    list.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:8px 0">No sets with questions yet.</div>`;
+  } else { render(); }
+  document.getElementById('quick10Sound').checked = soundEnabled();
+  modalOpen('quick10Modal');
+}
+function closeQuick10Modal(){ modalClose('quick10Modal'); }
+function startQuick10(){
+  const list = document.getElementById('quick10SetList');
+  const id = list._selectedId || (activeSetId);
+  if(!id) return;
+  const qs = loadQs(id);
+  if(!qs.length) return;
+  // Load the set if different from active
+  if(id !== activeSetId){
+    activeSetId = id;
+    questions = qs;
+    flaggedKeys = loadFlags(id);
+  }
+  closeQuick10Modal();
+  const pool = [...questions].sort(()=>Math.random()-.5).slice(0,10);
+  startQuizFromPool(pool);
 }
 function openBackupModal(){ modalOpen('backupModal'); }
 function closeBackupModal(){ modalClose('backupModal'); }
