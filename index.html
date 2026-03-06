@@ -427,20 +427,19 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 #syncSignInBtn svg{flex-shrink:0}
 
 /* ── Persistent header sync strip ── */
-#syncStrip{display:none;align-items:center;gap:7px;padding:5px 12px;
+#syncStrip{display:none;align-items:center;gap:6px;padding:3px 12px;
   background:var(--surface2);border-bottom:1px solid var(--border);
-  font-size:.7rem;color:var(--muted);cursor:pointer;
-  transition:background .15s}
+  font-size:.65rem;color:var(--muted);cursor:pointer;transition:background .15s}
 #syncStrip:hover{background:var(--surface)}
 #syncStrip.visible{display:flex}
-.sstrip-avatar{width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0}
-.sstrip-name{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
-.sstrip-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sstrip-avatar{display:none}
+.sstrip-name{display:none}
+.sstrip-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
 .sstrip-dot.ok{background:var(--green)}
 .sstrip-dot.err{background:var(--red)}
-.sstrip-dot.busy{background:var(--accent);animation:pulse .9s infinite}
-.sstrip-status{flex:1}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sstrip-dot.busy{background:var(--orange);animation:pulse .9s infinite}
+.sstrip-status{color:var(--muted)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ══ SPACED REPETITION (SRS) ══ */
 .srs-due-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;
@@ -472,12 +471,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   </header>
 
   <!-- SYNC STATUS STRIP (visible when signed into Google Drive) -->
-  <div id="syncStrip" onclick="openImportExportModal()" title="Open sync settings">
+  <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
     <div class="sstrip-dot" id="sstripDot"></div>
-    <img class="sstrip-avatar" id="sstripAvatar" src="" style="display:none" referrerpolicy="no-referrer">
-    <span class="sstrip-name" id="sstripName"></span>
-    <span class="sstrip-status" id="sstripStatus">Google Drive</span>
-    <span style="opacity:.4;font-size:.65rem">⇅ tap to manage</span>
+    <span class="sstrip-status" id="sstripStatus">Syncing…</span>
   </div>
 
   <!-- ═══ SETS HOME ═══ -->
@@ -2632,7 +2628,7 @@ window.markIncorrect = function(q){
 // ═══════════════════════════════════════════════════
 const GDRIVE = (() => {
   const CLIENT_ID   = '752845259407-e44vv7b61ct0549hvhsc9guu7vd2dscb.apps.googleusercontent.com';
-  const SCOPE       = 'https://www.googleapis.com/auth/drive.appdata';
+  const SCOPE = 'https://www.googleapis.com/auth/drive.appdata profile email';
   const FILE_NAME   = 'quizforge-sync.json';
   const MIME        = 'application/json';
 
@@ -2660,8 +2656,10 @@ const GDRIVE = (() => {
       const strip = document.getElementById('syncStrip');
       if(strip) strip.classList.remove('visible');
     } else {
-      const name = _userProfile ? _userProfile.name : 'Signed in';
-      const pic  = _userProfile ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer">` : '';
+      const name = _userProfile ? (_userProfile.name || _userProfile.email || 'Google User') : 'Signed in';
+      const pic  = _userProfile && _userProfile.picture
+        ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+        : `<span style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#000;flex-shrink:0">${(name[0]||'G').toUpperCase()}</span>`;
       wrap.innerHTML = `
         <div id="syncBar">
           ${pic}
@@ -2675,9 +2673,9 @@ const GDRIVE = (() => {
       if(strip){
         strip.classList.add('visible');
         const av = document.getElementById('sstripAvatar');
-        if(av && _userProfile){ av.src=_userProfile.picture; av.style.display='block'; }
+        if(av) av.style.display='none';
         const nm = document.getElementById('sstripName');
-        if(nm) nm.textContent = _userProfile ? _userProfile.name : 'Google Drive';
+        if(nm) nm.textContent = '';
       }
     }
   }
@@ -2715,9 +2713,11 @@ const GDRIVE = (() => {
   }
 
   function signOut(){
+    if(!confirm('Sign out of Google Drive?\n\nYour data will remain on this device but will no longer sync.')) return;
     if(_token) google.accounts.oauth2.revoke(_token, () => {});
     _token = null; _fileId = null; _userProfile = null;
     localStorage.removeItem('qforge_gdrive_token');
+    localStorage.removeItem('qforge_gdrive_profile');
     _renderBar();
   }
 
@@ -2726,8 +2726,20 @@ const GDRIVE = (() => {
       const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: 'Bearer ' + _token }
       });
-      _userProfile = await r.json();
-    } catch(e){ _userProfile = null; }
+      const data = await r.json();
+      // v3 userinfo returns 'name' and 'picture' — normalise just in case
+      _userProfile = {
+        name:    data.name || data.given_name || data.email || 'Google User',
+        picture: data.picture || '',
+        email:   data.email || ''
+      };
+      // Cache profile so name/avatar survive token expiry and page reload
+      localStorage.setItem('qforge_gdrive_profile', JSON.stringify(_userProfile));
+    } catch(e){
+      // Try restoring from cache if network fails
+      const cached = localStorage.getItem('qforge_gdrive_profile');
+      if(cached) try{ _userProfile = JSON.parse(cached); } catch(_){}
+    }
   }
 
   // ── Drive file helpers (appDataFolder — private to this app) ──
@@ -2868,11 +2880,15 @@ const GDRIVE = (() => {
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
     const saved = localStorage.getItem('qforge_gdrive_token');
+    // Restore cached profile immediately so name shows without waiting for fetch
+    const cachedProfile = localStorage.getItem('qforge_gdrive_profile');
+    if(cachedProfile) try{ _userProfile = JSON.parse(cachedProfile); } catch(_){}
     if(saved){
       _token = saved;
-      await _fetchProfile();
-      _renderBar();
-      syncNow(); // sync on load if already signed in
+      _renderBar(); // render strip immediately with cached profile
+      await _fetchProfile(); // then refresh profile in background
+      _renderBar(); // re-render with fresh profile
+      syncNow();
     } else {
       _renderBar();
     }
