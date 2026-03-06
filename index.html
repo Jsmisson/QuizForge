@@ -777,9 +777,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
-      <button class="btn btn-ghost-green" style="width:100%" onclick="closeExitQuizModal();showPartialResults()">📊 Save &amp; See Results</button>
-      <button class="btn btn-danger" style="width:100%" onclick="closeExitQuizModal();endQuiz()">✕ Exit Without Results</button>
-      <button class="btn btn-ghost" style="width:100%" onclick="closeExitQuizModal()">↩ Keep Going</button>
+      <button class="btn btn-ghost-green" style="width:100%" onclick="modalClose('exitQuizModal');showPartialResults()">📊 Save &amp; See Results</button>
+      <button class="btn btn-danger" style="width:100%" onclick="modalClose('exitQuizModal');endQuiz()">✕ Exit Without Results</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="modalClose('exitQuizModal')">↩ Keep Going</button>
     </div>
   </div>
 </div>
@@ -1174,7 +1174,14 @@ function showView(name){
   document.querySelectorAll('#innerApp .tab').forEach((t,i)=>t.classList.toggle('active',TAB_VIEWS[i]===name));
   if(name==='manage') renderQList();
   if(name!=='quiz'){ clearInterval(overallInterval); clearInterval(qInterval); }
-  // Scroll to top on view change
+  // Hide tabs + header actions during quiz for immersive mode
+  const isQuiz = name==='quiz' || name==='results';
+  const tabs = document.querySelector('#innerApp .tabs');
+  const hr = document.getElementById('headerRight');
+  const bc = document.querySelector('#innerApp .breadcrumb');
+  if(tabs) tabs.style.display = isQuiz ? 'none' : '';
+  if(hr) hr.style.display = isQuiz ? 'none' : '';
+  if(bc) bc.style.marginBottom = isQuiz ? '0' : '';
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -2590,6 +2597,7 @@ function endQuiz(){
   clearInterval(overallInterval); clearInterval(qInterval);
   if(_quizFromHome){ _quizFromHome = false; goHome(); return; }
   showView('manage');
+  renderHeader();
 }
 
 // ═══════════════════════════════════════════════════
