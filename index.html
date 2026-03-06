@@ -1061,6 +1061,7 @@ function markIncorrect(q){
   const existing=arr.find(x=>x.key===key);
   if(existing){ existing.streak=0; existing.lastWrong=Date.now(); }
   else arr.push({key,streak:0,lastWrong:Date.now()});
+  recordModified(activeSetId,'incorrect');
   saveIncorrect(activeSetId,arr);
 }
 function markCorrect(q){
@@ -1068,7 +1069,8 @@ function markCorrect(q){
   const existing=arr.find(x=>x.key===key);
   if(!existing) return;
   existing.streak=(existing.streak||0)+1;
-  if(existing.streak>=2) arr.splice(arr.findIndex(x=>x.key===key),1); // cleared after 2 correct in a row
+  if(existing.streak>=2) arr.splice(arr.findIndex(x=>x.key===key),1);
+  recordModified(activeSetId,'incorrect');
   saveIncorrect(activeSetId,arr);
 }
 
@@ -1133,7 +1135,7 @@ let overallSec=0, qSec=0, qMaxSec=60;
 function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
 function esc(s=''){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function save(){ if(activeSetId) saveQs(activeSetId,questions); }
-function saveFlg(){ if(activeSetId) saveFlags(activeSetId,flaggedKeys); }
+function saveFlg(){ if(activeSetId){ recordModified(activeSetId,'flags'); saveFlags(activeSetId,flaggedKeys); } }
 function showHomeMsg(msg,ok){ const el=document.getElementById('homeMsg'); el.style.display='block'; el.style.color=ok?'var(--green)':'var(--red)'; el.textContent=msg; }
 
 // ═══════════════════════════════════════════════════
@@ -1401,6 +1403,12 @@ function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; 
 function loadClearTimestamps(){ return JSON.parse(localStorage.getItem('qforge_clear_ts')||'{}'); }
 function saveClearTimestamps(ts){ localStorage.setItem('qforge_clear_ts',JSON.stringify(ts)); }
 function recordClear(setId, field){
+  const ts = loadClearTimestamps();
+  if(!ts[setId]) ts[setId] = {};
+  ts[setId][field] = Date.now();
+  saveClearTimestamps(ts);
+}
+function recordModified(setId, field){
   const ts = loadClearTimestamps();
   if(!ts[setId]) ts[setId] = {};
   ts[setId][field] = Date.now();
@@ -2935,22 +2943,24 @@ const GDRIVE = (() => {
         console.log('[Sync] adding cloud set locally:', cs.id, cs.name);
         mergedSets.push({ id: cs.id, name: cs.name, folderId: cs.folderId || null, created: cs.created || Date.now() });
       }
-      // Apply cloud content — respect clear timestamps
+      // Apply cloud content — only overwrite flags/incorrect if cloud is newer than local modification
       const setTs = mergedClearTs[cs.id] || {};
       const cloudSyncedAt = data.synced ? new Date(data.synced).getTime() : 0;
 
       localStorage.setItem('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
 
+      // Apply cloud flags only if local flags haven't been modified more recently
       if(!setTs.flags || cloudSyncedAt > setTs.flags){
         localStorage.setItem('qforge_flags_' + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []));
       } else {
-        console.log('[Sync] skipping cloud flags for', cs.name, '— cleared after last cloud sync');
+        console.log('[Sync] keeping local flags for', cs.name, '— modified after cloud sync');
       }
 
+      // Apply cloud incorrect only if local incorrect hasn't been modified more recently
       if(!setTs.incorrect || cloudSyncedAt > setTs.incorrect){
         localStorage.setItem('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
       } else {
-        console.log('[Sync] skipping cloud incorrect for', cs.name, '— cleared after last cloud sync');
+        console.log('[Sync] keeping local incorrect for', cs.name, '— modified after cloud sync');
       }
 
       if(Array.isArray(cs.srsData)) localStorage.setItem('qforge_srs_' + cs.id, JSON.stringify(cs.srsData));
