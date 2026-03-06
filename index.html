@@ -465,7 +465,10 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   <!-- HEADER -->
   <header>
     <div class="logo-wrap">
-      <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
+      <div style="display:flex;align-items:baseline;gap:7px">
+        <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.91</span>
+      </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
         <span class="sstrip-status" id="sstripStatus">Syncing…</span>
