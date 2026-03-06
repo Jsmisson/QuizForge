@@ -2994,6 +2994,7 @@ const GDRIVE = (() => {
         const expiry = Date.now() + 55 * 60 * 1000;
         localStorage.setItem('qforge_gdrive_token', _token);
         localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
+        _scheduleTokenRefresh(expiry);
         await _fetchProfile();
         _renderBar();
         await syncNow();
@@ -3002,20 +3003,32 @@ const GDRIVE = (() => {
     client.requestAccessToken();
   }
 
+  let _refreshTimer = null;
+
+  function _scheduleTokenRefresh(expiryMs){
+    clearTimeout(_refreshTimer);
+    const msUntilRefresh = expiryMs - Date.now() - 5 * 60 * 1000;
+    if(msUntilRefresh <= 0){ _silentReauth(); return; }
+    console.log('[Sync] token refresh scheduled in', Math.round(msUntilRefresh/60000), 'min');
+    _refreshTimer = setTimeout(()=>{ console.log('[Sync] proactive token refresh'); _silentReauth(); }, msUntilRefresh);
+  }
+
   function _silentReauth(){
     if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID') return;
+    if(typeof google === 'undefined'){ setTimeout(_silentReauth, 2000); return; }
     console.log('[Sync] attempting silent re-auth');
     const client = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
       prompt: '',
       callback: async (resp) => {
-        if(resp.error){ console.warn('[Sync] silent re-auth failed:', resp.error); _setStatus('Session expired — sign in again', 'err'); _renderBar(); return; }
+        if(resp.error){ console.warn('[Sync] silent re-auth failed:', resp.error); _setStatus('Session expired — sign in again', 'err'); _token=null; localStorage.removeItem('qforge_gdrive_token'); localStorage.removeItem('qforge_gdrive_token_expiry'); _renderBar(); return; }
         _token = resp.access_token;
         const expiry = Date.now() + 55 * 60 * 1000;
         localStorage.setItem('qforge_gdrive_token', _token);
         localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
         console.log('[Sync] silent re-auth success');
+        _scheduleTokenRefresh(expiry);
         await syncNow();
       }
     });
@@ -3315,15 +3328,17 @@ const GDRIVE = (() => {
     if(saved){
       // Check if token is expired (tokens last ~1 hour)
       if(tokenExpiry && Date.now() > parseInt(tokenExpiry)){
-        console.log('[Sync] stored token expired, clearing');
+        console.log('[Sync] stored token expired, attempting silent reauth');
         _token = null;
         localStorage.removeItem('qforge_gdrive_token');
         localStorage.removeItem('qforge_gdrive_token_expiry');
         _renderBar();
+        _silentReauth();
         return;
       }
       _token = saved;
       console.log('[Sync] restored token from storage, expiry:', new Date(parseInt(tokenExpiry||0)).toLocaleTimeString());
+      _scheduleTokenRefresh(parseInt(tokenExpiry));
       _renderBar();
       await _fetchProfile();
       _renderBar();
