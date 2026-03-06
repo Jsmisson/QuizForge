@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.98</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v1.00</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -1295,7 +1295,7 @@ function startQuizFromPool(pool, extra={}){
 let activeSetId=null, questions=[], flaggedKeys=[];
 let quiz={questions:[],idx:0,score:0,selected:[],timeouts:0};
 let answered=false, qFilter='all', editingIdx=null;
-let overallInterval=null, qInterval=null;
+let overallInterval=null, qInterval=null, _qTimerGen=0;
 let overallSec=0, qSec=0, qMaxSec=60;
 
 // ═══════════════════════════════════════════════════
@@ -1343,6 +1343,13 @@ function goHome(){
   if(document.getElementById('view-quiz').classList.contains('active')){
     openExitQuizModal(); return;
   }
+  // Reset any elements quiz immersive mode may have hidden before leaving innerApp
+  const tabs=document.querySelector('#innerApp .tabs');
+  const bc=document.querySelector('#innerApp .breadcrumb');
+  const hr=document.getElementById('headerRight');
+  if(tabs) tabs.style.display='';
+  if(bc) bc.style.display='';
+  if(hr) hr.style.display='';
   activeSetId=null; questions=[]; flaggedKeys=[];
   document.getElementById('innerApp').style.display='none';
   document.getElementById('view-home').classList.add('active');
@@ -1370,6 +1377,15 @@ function openSet(id){
   document.getElementById('renameInput').value=set.name;
   populateFolderSelects();
   document.getElementById('setFolderSelect').value=set.folderId||'';
+  // Always reset elements that quiz immersive mode may have hidden
+  const tabs=document.querySelector('#innerApp .tabs');
+  const bc=document.querySelector('#innerApp .breadcrumb');
+  const hr=document.getElementById('headerRight');
+  if(tabs) tabs.style.display='';
+  if(bc) bc.style.display='';
+  if(hr) hr.style.display='';
+  const quizSetName=document.getElementById('quizSetName');
+  if(quizSetName) quizSetName.style.display='none';
   renderHeader();
   INNER_VIEWS.forEach(v=>{ const el=document.getElementById('view-'+v); if(el) el.classList.remove('active'); });
   document.getElementById('view-manage').classList.add('active');
@@ -1742,12 +1758,12 @@ function _loadImgIntoEdit(imageRef){
   _setImgUI('edit', ImageStore.get(imageRef) || null);
 }
 
-// Resolve image source for rendering
+// Resolve image source for rendering — returns a Promise for consistent async handling
 function _resolveImgSrc(q){
-  if(!q) return null;
-  if(q.imageRef) return ImageStore.get(q.imageRef);
-  if(q.image) return q.image; // legacy: inline image not yet migrated
-  return null;
+  if(!q) return Promise.resolve(null);
+  if(q.imageRef) return Promise.resolve(ImageStore.get(q.imageRef) || null);
+  if(q.image) return Promise.resolve(q.image); // legacy inline
+  return Promise.resolve(null);
 }
 
 function saveQuestion(){
@@ -2389,7 +2405,12 @@ function startQTimer(){
   const wrap=document.getElementById('qTimerWrap');
   if(!qMaxSec){wrap.style.display='none';return;}
   wrap.style.display='flex'; qSec=qMaxSec; updateQTimer();
-  qInterval=setInterval(()=>{ qSec--; updateQTimer(); if(qSec<=0){clearInterval(qInterval);onTimeout();} },1000);
+  const gen = ++_qTimerGen; // capture generation for this question
+  qInterval=setInterval(()=>{
+    if(gen !== _qTimerGen){ clearInterval(qInterval); return; } // stale — wrong question
+    qSec--; updateQTimer();
+    if(qSec<=0){ clearInterval(qInterval); onTimeout(); }
+  },1000);
 }
 function updateQTimer(){
   document.getElementById('ringTxt').textContent=qSec<=99?qSec:'∞';
@@ -3580,6 +3601,8 @@ const GDRIVE = (() => {
         const cloudData = await _readFile(_fileId);
         await _applyPayload(cloudData);
         try{ renderSetsGrid(); } catch(e){}
+        // Re-render question list if open — images are now in cache after applyPayload
+        try{ if(activeSetId && document.getElementById('view-manage').classList.contains('active')) renderQList(); } catch(e){}
       }
 
       // 3. Push merged local state back to cloud (now async — bundles images)
