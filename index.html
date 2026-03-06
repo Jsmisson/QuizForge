@@ -1195,7 +1195,7 @@ function openSet(id){
 }
 
 function loadGridOrder(){ return JSON.parse(localStorage.getItem('qforge_grid_order')||'[]'); }
-function saveGridOrder(order){ localStorage.setItem('qforge_grid_order',JSON.stringify(order)); }
+function saveGridOrder(order){ localStorage.setItem('qforge_grid_order',JSON.stringify(order)); recordModified('__grid__','order'); }
 
 function renderSetsGrid(){
   const fb=document.getElementById('createSetFallback'); if(fb) fb.remove();
@@ -2863,6 +2863,7 @@ const GDRIVE = (() => {
       synced: new Date().toISOString(),
       tombstones,
       clearTimestamps: clearTs,
+      gridOrder: loadGridOrder(),
       folders,
       sets: sets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
@@ -2968,6 +2969,17 @@ const GDRIVE = (() => {
 
     localStorage.setItem('qforge_sets', JSON.stringify(mergedSets));
     console.log('[Sync] final mergedSets saved:', mergedSets.map(s=>s.id+':'+s.name));
+
+    // Apply cloud grid order if newer than local
+    if(Array.isArray(data.gridOrder) && data.gridOrder.length){
+      const gridTs = (mergedClearTs['__grid__'] || {}).order || 0;
+      if(!gridTs || cloudSyncedAt > gridTs){
+        localStorage.setItem('qforge_grid_order', JSON.stringify(data.gridOrder));
+        console.log('[Sync] applied cloud grid order');
+      } else {
+        console.log('[Sync] keeping local grid order — modified after cloud sync');
+      }
+    }
   }
 
   // ── Main sync — pull then push merged result ──
