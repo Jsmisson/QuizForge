@@ -436,7 +436,8 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 .sstrip-dot.ok{background:var(--green)}
 .sstrip-dot.err{background:var(--red)}
 .sstrip-dot.busy{background:var(--orange);animation:pulse .9s infinite}
-.sstrip-status{color:var(--muted)}
+.sstrip-status{color:var(--muted);word-break:break-word;max-width:220px}
+.sstrip-dot.err~.sstrip-status{color:var(--red);max-width:260px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ══ SPACED REPETITION (SRS) ══ */
@@ -467,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.92</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.93</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -3562,7 +3563,9 @@ const GDRIVE = (() => {
       } else if(e.message && e.message.includes('Failed to fetch')){
         _setStatus('Offline — will retry', 'err');
       } else {
-        _setStatus('Sync error — check console', 'err');
+        // Show the actual error message on screen — critical for debugging on iOS where console is inaccessible
+        const shortMsg = (e.message || 'unknown error').slice(0, 120);
+        _setStatus('Sync error: ' + shortMsg, 'err');
       }
     } finally {
       _syncing = false;
