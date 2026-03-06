@@ -781,8 +781,8 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
-      <button class="btn btn-ghost-green" style="width:100%" onclick="modalClose('exitQuizModal');setTimeout(showPartialResults,50)">📊 Save &amp; See Results</button>
-      <button class="btn btn-danger" style="width:100%" onclick="modalClose('exitQuizModal');setTimeout(endQuiz,50)">✕ Exit Without Results</button>
+      <button class="btn btn-ghost-green" style="width:100%" onclick="document.getElementById('exitQuizModal').style.display='none';document.body.classList.remove('modal-open');document.body.style.top='';showPartialResults()">📊 Save &amp; See Results</button>
+      <button class="btn btn-danger" style="width:100%" onclick="document.getElementById('exitQuizModal').style.display='none';document.body.classList.remove('modal-open');document.body.style.top='';endQuiz()">✕ Exit Without Results</button>
       <button class="btn btn-ghost" style="width:100%" onclick="modalClose('exitQuizModal')">↩ Keep Going</button>
     </div>
   </div>
