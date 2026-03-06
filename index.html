@@ -1397,8 +1397,17 @@ function renameCurrentSet(){
 function flagKey(q){ return incorrectKey(q); }
 function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
 function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
-function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); renderQList(); }
-function clearIncorrect(){ if(!confirm('Clear all incorrect tracking for this set?')) return; saveIncorrect(activeSetId,[]); renderQList(); renderHeader(); }
+function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); recordClear(activeSetId,'flags'); renderQList(); }
+function loadClearTimestamps(){ return JSON.parse(localStorage.getItem('qforge_clear_ts')||'{}'); }
+function saveClearTimestamps(ts){ localStorage.setItem('qforge_clear_ts',JSON.stringify(ts)); }
+function recordClear(setId, field){
+  const ts = loadClearTimestamps();
+  if(!ts[setId]) ts[setId] = {};
+  ts[setId][field] = Date.now();
+  saveClearTimestamps(ts);
+}
+
+function clearIncorrect(){ if(!confirm('Clear all incorrect tracking for this set?')) return; saveIncorrect(activeSetId,[]); recordClear(activeSetId,'incorrect'); renderQList(); renderHeader(); }
 
 function setFilter(f){
   qFilter=f;
@@ -2839,11 +2848,13 @@ const GDRIVE = (() => {
   function _buildPayload(){
     const sets = loadSets(), folders = loadFolders();
     const tombstones = loadTombstones();
+    const clearTs = loadClearTimestamps();
     console.log('[Sync] building payload — sets:', sets.length, 'tombstones:', tombstones);
     return {
       type: 'fullbackup', version: 4,
       synced: new Date().toISOString(),
       tombstones,
+      clearTimestamps: clearTs,
       folders,
       sets: sets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
@@ -2873,7 +2884,18 @@ const GDRIVE = (() => {
     const deletedIds = new Set(mergedTombstones.map(t => t.id));
     console.log('[Sync] deletedIds:', [...deletedIds]);
 
-    // ── KEY FIX: purge any locally existing sets that are tombstoned ──
+    // Merge clear timestamps — take the most recent clear per set per field
+    const localClearTs  = loadClearTimestamps();
+    const cloudClearTs  = (data.clearTimestamps && typeof data.clearTimestamps === 'object') ? data.clearTimestamps : {};
+    const mergedClearTs = JSON.parse(JSON.stringify(localClearTs));
+    Object.entries(cloudClearTs).forEach(([setId, fields]) => {
+      if(!mergedClearTs[setId]) mergedClearTs[setId] = {};
+      Object.entries(fields).forEach(([field, ts]) => {
+        if(!mergedClearTs[setId][field] || ts > mergedClearTs[setId][field])
+          mergedClearTs[setId][field] = ts;
+      });
+    });
+    saveClearTimestamps(mergedClearTs);
     const localSets = loadSets();
     console.log('[Sync] localSets before purge:', localSets.map(s=>s.id+':'+s.name));
     localSets.forEach(s => {
@@ -2913,9 +2935,24 @@ const GDRIVE = (() => {
         console.log('[Sync] adding cloud set locally:', cs.id, cs.name);
         mergedSets.push({ id: cs.id, name: cs.name, folderId: cs.folderId || null, created: cs.created || Date.now() });
       }
-      localStorage.setItem('qforge_qs_'        + cs.id, JSON.stringify(Array.isArray(cs.questions)         ? cs.questions         : []));
-      localStorage.setItem('qforge_flags_'     + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys)       ? cs.flaggedKeys       : []));
-      localStorage.setItem('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
+      // Apply cloud content — respect clear timestamps
+      const setTs = mergedClearTs[cs.id] || {};
+      const cloudSyncedAt = data.synced ? new Date(data.synced).getTime() : 0;
+
+      localStorage.setItem('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+
+      if(!setTs.flags || cloudSyncedAt > setTs.flags){
+        localStorage.setItem('qforge_flags_' + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []));
+      } else {
+        console.log('[Sync] skipping cloud flags for', cs.name, '— cleared after last cloud sync');
+      }
+
+      if(!setTs.incorrect || cloudSyncedAt > setTs.incorrect){
+        localStorage.setItem('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
+      } else {
+        console.log('[Sync] skipping cloud incorrect for', cs.name, '— cleared after last cloud sync');
+      }
+
       if(Array.isArray(cs.srsData)) localStorage.setItem('qforge_srs_' + cs.id, JSON.stringify(cs.srsData));
     });
 
