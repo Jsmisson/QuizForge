@@ -487,6 +487,10 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
               <span style="font-size:.82rem">🔊 Sound</span>
               <label class="toggle" style="margin:0"><input type="checkbox" id="menuSound" onchange="toggleSound()"><span class="toggle-slider"></span></label>
             </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px">
+              <span style="font-size:.82rem">📅 Due Badges</span>
+              <label class="toggle" style="margin:0"><input type="checkbox" id="menuDueBadges" onchange="toggleDueBadges()"><span class="toggle-slider"></span></label>
+            </div>
           </div>
         </div>
         <button class="btn btn-ghost-accent btn-sm" onclick="openQuick10Modal()">⚡ Quick 10</button>
@@ -658,13 +662,10 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
             <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
             <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
           </div>
+          <button class="btn btn-flag" id="flagBtn" onclick="toggleFlag()" style="padding:5px 9px;font-size:.75rem;min-height:0">🚩</button>
         </div>
       </div>
       <div class="question-card anim" id="questionCard">
-        <div class="question-top">
-          <div class="question-num" id="questionNum">Question 1</div>
-          <button class="btn btn-flag" id="flagBtn" onclick="toggleFlag()">🚩 Flag</button>
-        </div>
         <div class="question-text" id="questionText"></div>
         <img id="questionImg" class="question-img" src="" alt="" style="display:none">
         <div class="question-hint" id="questionHint" style="display:none"></div>
@@ -819,7 +820,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       </div>
       <div class="settings-row"><div><div class="s-lbl">📅 Due Today Only</div><div class="s-desc">SM-2 spaced repetition</div></div><label class="toggle"><input type="checkbox" id="settSRSOnly"><span class="toggle-slider"></span></label></div>
       <div class="settings-row"><div><div class="s-lbl">Timer per Question (s)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
-      <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
+
     </div>
 
     <div class="modal-footer" style="margin-top:16px">
@@ -1195,7 +1196,8 @@ function showView(name){
     quizSetName.style.display = name==='quiz' ? '' : 'none';
     if(name==='quiz') quizSetName.textContent = document.getElementById('bcSetName').textContent;
   }
-  window.scrollTo({top:0,behavior:'smooth'});
+  // Use instant scroll for quiz transitions to prevent layout shift eating taps
+  window.scrollTo({top:0, behavior: (name==='quiz'||name==='results'||name==='manage') ? 'instant' : 'smooth'});
 }
 
 // ═══════════════════════════════════════════════════
@@ -1282,7 +1284,7 @@ function renderSetsGrid(){
       html+=`<div class="set-card" onclick="openSet('${s.id}')">
         <div class="set-card-name">${esc(s.name)}</div>
         <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
-        ${due>0?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
+        ${due>0&&dueBadgesEnabled()?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
       </div>`;
     }
   });
@@ -1309,7 +1311,7 @@ function openFolder(folderId){
       <div class="set-card-name">${esc(s.name)}</div>
       <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
       ${isActive?'<span class="set-card-badge">Active</span>':''}
-      ${due>0?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
+      ${due>0&&dueBadgesEnabled()?`<span class="srs-due-badge">📅 ${due} due</span>`:''}
     </div>`;
   });
 
@@ -1954,7 +1956,9 @@ function toggleHomeMenu(e){
   const m = document.getElementById('homeMenu');
   m.style.display = m.style.display === 'none' ? '' : 'none';
   if(m.style.display !== 'none'){
-
+    _updateSoundToggle();
+    const db = document.getElementById('menuDueBadges');
+    if(db) db.checked = dueBadgesEnabled();
     setTimeout(()=>document.addEventListener('click', closeHomeMenu, {once:true}), 0);
   }
 }
@@ -2190,7 +2194,6 @@ function onTimeout(){
   document.getElementById('fbExplain').textContent=`Correct: ${q.correct.map(i=>q.options[i]).join(', ')}${q.explain?' — '+q.explain:''}`;
   const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
   sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
-  if(document.getElementById('settAutoAdvance').checked) setTimeout(nextQuestion,2000);
 }
 function renderQuestion(){
   answered=false; quiz.selected=[];
@@ -2210,7 +2213,8 @@ function renderQuestion(){
   document.getElementById('scoreDisplay').textContent=quiz.score;
   document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
   const fl=isFlagged(q), fb=document.getElementById('flagBtn');
-  fb.textContent=fl?'🚩 Flagged':'🚩 Flag'; fb.className='btn btn-flag'+(fl?' flagged':'');
+  fb.textContent='🚩'; fb.className='btn btn-flag'+(fl?' flagged':'');
+  fb.style.cssText='padding:5px 9px;font-size:.75rem;min-height:0'+(fl?';background:rgba(255,215,64,.15)':'');
   document.getElementById('questionCard').classList.toggle('is-flagged',fl);
   const feedEl=document.getElementById('feedbackBox'); feedEl.className='feedback-box'; feedEl.style.display='none';
 
@@ -2365,7 +2369,8 @@ function cardAnswer(gotIt){
 function toggleFlag(){
   const q=quiz.questions[quiz.idx]; toggleGlobalFlag(q);
   const fl=isFlagged(q), btn=document.getElementById('flagBtn');
-  btn.textContent=fl?'🚩 Flagged':'🚩 Flag'; btn.className='btn btn-flag'+(fl?' flagged':'');
+  btn.textContent='🚩'; btn.className='btn btn-flag'+(fl?' flagged':'');
+  btn.style.cssText='padding:5px 9px;font-size:.75rem;min-height:0'+(fl?';background:rgba(255,215,64,.15)':'');
   document.getElementById('questionCard').classList.toggle('is-flagged',fl);
 }
 function toggleChoice(i){
@@ -2554,11 +2559,28 @@ function renderIncorrectReview(){
     </div>`;
   }).join('');
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function openExitQuizModal(){
-  const answered=quiz.idx; // questions attempted so far (including current if answered)
-  const total=quiz.questions.length;
-  const remaining=total-quiz.idx-(window.answered?1:0);
-  const attempted=quiz.idx+(window.answered?1:0);
+  const total = quiz.questions.length;
+  const attempted = quiz.idx + (answered ? 1 : 0);
+  const skipped = total - attempted;
   document.getElementById('exitQuizSummary').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
@@ -2566,8 +2588,8 @@ function openExitQuizModal(){
         <span style="font-size:.82rem;font-weight:700;color:var(--green)">${attempted} of ${total}</span>
       </div>
       <div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
-        <span style="font-size:.82rem;color:var(--muted)">⏭ Skipped</span>
-        <span style="font-size:.82rem;font-weight:700;color:var(--muted)">${total-attempted} not seen</span>
+        <span style="font-size:.82rem;color:var(--muted)">⏭ Not seen</span>
+        <span style="font-size:.82rem;font-weight:700;color:var(--muted)">${skipped}</span>
       </div>
       <p style="font-size:.76rem;color:var(--muted);padding:4px 0">Flags and incorrect tracking from answered questions will be saved.</p>
     </div>`;
@@ -2579,7 +2601,7 @@ function closeExitQuizModal(e){
 }
 function showPartialResults(){
   // Only count questions that were actually answered
-  const attempted=quiz.questions.slice(0, quiz.idx+(window.answered?1:0));
+  const attempted=quiz.questions.slice(0, quiz.idx+(answered?1:0));
   if(!attempted.length){ endQuiz(); return; }
   // Temporarily override quiz to only show answered questions
   const savedQuestions=quiz.questions;
@@ -2741,7 +2763,13 @@ const SFX = (() => {
   return { correct, incorrect, flip };
 })();
 
-function soundEnabled(){
+function dueBadgesEnabled(){ return localStorage.getItem('qforge_due_badges') !== 'off'; }
+function toggleDueBadges(){
+  localStorage.setItem('qforge_due_badges', dueBadgesEnabled() ? 'off' : 'on');
+  const el = document.getElementById('menuDueBadges');
+  if(el) el.checked = dueBadgesEnabled();
+  renderSetsGrid();
+}
   return localStorage.getItem('qforge_sound') !== 'off';
 }
 function toggleSound(){
