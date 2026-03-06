@@ -2676,9 +2676,15 @@ const GDRIVE = (() => {
           </svg>
           Sign in with Google to sync
         </button>`;
-      // Hide strip when signed out
+      // Show strip as a sign-in prompt when signed out
       const strip = document.getElementById('syncStrip');
-      if(strip) strip.classList.remove('visible');
+      if(strip){
+        strip.classList.add('visible');
+        const dot = document.getElementById('sstripDot');
+        const status = document.getElementById('sstripStatus');
+        if(dot) dot.className = 'sstrip-dot';
+        if(status) status.textContent = 'Sign in to sync';
+      }
     } else {
       const name = _userProfile ? (_userProfile.name || _userProfile.email || 'Google User') : 'Signed in';
       const pic  = _userProfile && _userProfile.picture
