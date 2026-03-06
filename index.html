@@ -3275,6 +3275,9 @@ const GDRIVE = (() => {
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc`,
       { headers: { Authorization: 'Bearer ' + _token } }
     );
+    if(r.status === 401) throw new Error('findFile: 401 Unauthorized');
+    if(r.status === 403) throw new Error('findFile: 403 insufficient authentication scopes');
+    if(!r.ok) throw new Error('findFile: HTTP ' + r.status);
     const d = await r.json();
     console.log('[QuizForge Sync] findFile — all matches:', JSON.stringify(d.files));
     if(d.error){ throw new Error('findFile: ' + d.error.message); }
@@ -3296,6 +3299,8 @@ const GDRIVE = (() => {
       `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
       { headers: { Authorization: 'Bearer ' + _token } }
     );
+    if(r.status === 401) throw new Error('readFile: 401 Unauthorized');
+    if(r.status === 403) throw new Error('readFile: 403 insufficient authentication scopes');
     if(!r.ok){ throw new Error('readFile HTTP ' + r.status); }
     const d = await r.json();
     console.log('[QuizForge Sync] readFile sets count:', d && d.sets ? d.sets.length : 'n/a');
@@ -3538,6 +3543,13 @@ const GDRIVE = (() => {
         localStorage.removeItem('qforge_gdrive_token_expiry');
         _setStatus('Reconnecting…', 'busy');
         _silentReauth();
+      } else if(e.message && (e.message.includes('403') || e.message.includes('insufficient') || e.message.includes('authentication scopes') || e.message.includes('insufficientPermissions'))){
+        // Stale token or scope mismatch — clear it and prompt fresh interactive sign-in
+        _token = null;
+        localStorage.removeItem('qforge_gdrive_token');
+        localStorage.removeItem('qforge_gdrive_token_expiry');
+        _setStatus('Re-authorisation needed', 'err');
+        _renderBar();
       } else if(e.message && e.message.includes('Failed to fetch')){
         _setStatus('Offline — will retry', 'err');
       } else {
