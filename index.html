@@ -37,11 +37,11 @@ body::before{content:'';position:fixed;inset:0;
 h1{font-size:clamp(1.1rem,4vw,1.4rem)}
 
 /* ── Header ── */
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:10px}
-.logo-wrap{display:flex;flex-direction:column;gap:2px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:8px;flex-wrap:wrap}
+.logo-wrap{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
 .logo{font-size:clamp(1.2rem,5vw,1.4rem);font-weight:800;letter-spacing:-.5px;cursor:pointer;user-select:none}
 .logo span{color:var(--accent)}
-.header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.header-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;flex:1;min-width:0}
 .breadcrumb{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--muted);min-width:0}
 .breadcrumb .sep{opacity:.4;flex-shrink:0}
 .breadcrumb .set-name{color:var(--accent);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(160px,40vw)}
@@ -68,7 +68,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .btn-flag{background:transparent;color:var(--yellow);border:1px solid rgba(255,215,64,.4);font-size:.75rem;padding:7px 14px}
 .btn-flag.flagged{background:rgba(255,215,64,.15);border-color:var(--yellow)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
-.btn-sm{padding:7px 12px;font-size:.72rem;min-height:36px}
+.btn-sm{padding:7px 10px;font-size:.72rem;min-height:36px}
 @media(hover:hover){
   .btn-primary:hover{background:#33ecff;transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,229,255,.3)}
   .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
@@ -636,23 +636,27 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <div class="quiz-header">
         <button class="btn btn-ghost btn-sm" onclick="openExitQuizModal()">← Exit</button>
         <div class="progress-bar-wrap">
-          <div class="progress-label"><span id="progressLabel">Q 1 of 10</span><span id="progressPct">0%</span></div>
+          <div class="progress-label">
+            <span id="progressLabel">Q 1 of 10</span>
+            <span id="quizSetName" style="color:var(--accent);font-size:.65rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;display:none"></span>
+            <span id="progressPct">0%</span>
+          </div>
           <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
         </div>
-        <div id="scoreBadgeWrap" style="display:flex;gap:6px;align-items:center">
-          <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
-          <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
-        </div>
-      </div>
-      <div class="timer-row">
-        <div class="timer-box" id="overallBox"><span class="t-lbl">Total</span><span class="t-val" id="overallVal">00:00</span></div>
-        <div class="q-ring-wrap" id="qTimerWrap" style="display:none">
-          <div class="q-ring">
-            <svg width="44" height="44" viewBox="0 0 44 44">
-              <circle class="r-bg" cx="22" cy="22" r="18"/>
-              <circle class="r-fill" id="ringFill" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="0"/>
-            </svg>
-            <div class="r-txt" id="ringTxt">60</div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <div class="timer-box" id="overallBox" style="padding:4px 8px;gap:4px"><span class="t-lbl">⏱</span><span class="t-val" id="overallVal" style="font-size:.78rem;font-family:'JetBrains Mono',monospace">00:00</span></div>
+          <div class="q-ring-wrap" id="qTimerWrap" style="display:none">
+            <div class="q-ring" style="width:36px;height:36px">
+              <svg width="36" height="36" viewBox="0 0 44 44">
+                <circle class="r-bg" cx="22" cy="22" r="18"/>
+                <circle class="r-fill" id="ringFill" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="0"/>
+              </svg>
+              <div class="r-txt" id="ringTxt" style="font-size:.62rem">60</div>
+            </div>
+          </div>
+          <div id="scoreBadgeWrap" style="display:flex;gap:4px;align-items:center">
+            <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
+            <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
           </div>
         </div>
       </div>
@@ -1181,7 +1185,13 @@ function showView(name){
   const bc = document.querySelector('#innerApp .breadcrumb');
   if(tabs) tabs.style.display = isQuiz ? 'none' : '';
   if(hr) hr.style.display = isQuiz ? 'none' : '';
-  if(bc) bc.style.marginBottom = isQuiz ? '0' : '';
+  if(bc) bc.style.display = isQuiz ? 'none' : '';
+  // Show set name inside quiz header
+  const quizSetName = document.getElementById('quizSetName');
+  if(quizSetName){
+    quizSetName.style.display = name==='quiz' ? '' : 'none';
+    if(name==='quiz') quizSetName.textContent = document.getElementById('bcSetName').textContent;
+  }
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
