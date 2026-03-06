@@ -365,6 +365,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         <p>Each set has its own questions and flags.</p>
       </div>
       <div class="sets-header-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openQuizOptsModal()">⚙️ Quiz Options</button>
         <button class="btn btn-ghost btn-sm" onclick="openExportModal()">⬇ Export</button>
         <label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆ Import
           <input type="file" accept=".qforge,.json" style="display:none" onchange="importBank(event)">
@@ -398,6 +399,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
           <div class="filter-chips">
             <button class="chip active" id="chipAll" onclick="setFilter('all')">All</button>
             <button class="chip" id="chipFlagged" onclick="setFilter('flagged')">🚩 (<span id="flagCount">0</span>)</button>
+            <button class="chip" id="chipIncorrect" onclick="setFilter('incorrect')">❌ (<span id="incorrectCount">0</span>)</button>
           </div>
         </div>
         <div id="qList" class="q-list"></div>
@@ -454,18 +456,9 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
     <!-- SETTINGS -->
     <div id="view-settings" class="view">
       <div class="card">
-        <div class="card-title">Quiz Behaviour</div>
-        <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div><div class="s-desc">Randomize order each quiz</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
-        <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div><div class="s-desc">Randomize option order</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
-        <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">Max questions per quiz (0 = all)</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
-        <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
-        <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
-        <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Timers</div>
-        <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600"></div>
-        <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
+        <div class="card-title" style="margin-bottom:6px">Quiz Options</div>
+        <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Quiz settings are now managed globally from the Sets screen.</p>
+        <button class="btn btn-ghost" style="width:100%" onclick="goHome();setTimeout(openQuizOptsModal,200)">⚙️ Open Quiz Options</button>
       </div>
       <div class="card">
         <div class="card-title">This Set</div>
@@ -483,6 +476,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         <div class="danger-row">
           <button class="btn btn-danger btn-sm" onclick="clearAllQuestions()">🗑 Clear Questions</button>
           <button class="btn btn-sm" style="color:var(--yellow);border:1px solid rgba(255,215,64,.4);background:transparent" onclick="clearAllFlags()">🚩 Clear Flags</button>
+          <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(255,82,82,.4);background:transparent" onclick="clearIncorrect()">❌ Clear Incorrect</button>
           <button class="btn btn-danger btn-sm" onclick="deleteCurrentSet()">✕ Delete Set</button>
         </div>
       </div>
@@ -543,6 +537,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         </div>
         <div class="result-actions">
           <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
+          <button class="btn btn-ghost" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none;color:var(--red);border-color:rgba(255,82,82,.4)">❌ Review Incorrect</button>
           <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
           <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
         </div>
@@ -555,6 +550,46 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
   </div><!-- /innerApp -->
 </div><!-- /app -->
+
+<!-- PRE-QUIZ MODAL -->
+<div class="modal-overlay" id="preQuizModal" style="display:none" onclick="closePreQuizModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">▶ Start Quiz</div>
+
+    <!-- Settings summary -->
+    <div id="preQuizSummary" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
+
+    <div class="modal-footer" style="flex-direction:column;gap:10px">
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:.95rem" onclick="closePreQuizModal();startQuiz()">▶ Start Now</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="closePreQuizModal();openQuizOptsModal()">⚙️ Edit Options</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUIZ OPTIONS MODAL -->
+<div class="modal-overlay" id="quizOptsModal" style="display:none" onclick="closeQuizOptsModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:500px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">⚙️ Quiz Options</div>
+
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Behaviour</div>
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div><div class="s-desc">Randomize order each quiz</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div><div class="s-desc">Randomize option order</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">Max questions per quiz (0 = all)</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+    <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
+
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Timers</div>
+    <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+    <div class="settings-row"><div><div class="s-lbl">Auto-advance on Timeout</div><div class="s-desc">Move to next question automatically</div></div><label class="toggle"><input type="checkbox" id="settAutoAdvance" checked><span class="toggle-slider"></span></label></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeQuizOptsModal()">Done</button>
+    </div>
+  </div>
+</div>
 
 <!-- EXPORT MODAL -->
 <div class="modal-overlay" id="exportModal" style="display:none" onclick="closeExportModal(event)">
@@ -648,6 +683,27 @@ function saveQs(id,qs){ localStorage.setItem('qforge_qs_'+id,JSON.stringify(qs))
 function loadFlags(id){ return JSON.parse(localStorage.getItem('qforge_flags_'+id)||'[]'); }
 function saveFlags(id,fl){ localStorage.setItem('qforge_flags_'+id,JSON.stringify(fl)); }
 
+// Incorrect tracking: {key: questionText, streak: consecutive correct count needed to clear}
+function loadIncorrect(id){ return JSON.parse(localStorage.getItem('qforge_incorrect_'+id)||'[]'); }
+function saveIncorrect(id,arr){ localStorage.setItem('qforge_incorrect_'+id,JSON.stringify(arr)); }
+function incorrectKey(q){ return q.text.trim(); }
+function isIncorrect(q){ return loadIncorrect(activeSetId).some(x=>x.key===incorrectKey(q)); }
+function markIncorrect(q){
+  const arr=loadIncorrect(activeSetId), key=incorrectKey(q);
+  const existing=arr.find(x=>x.key===key);
+  if(existing){ existing.streak=0; existing.lastWrong=Date.now(); }
+  else arr.push({key,streak:0,lastWrong:Date.now()});
+  saveIncorrect(activeSetId,arr);
+}
+function markCorrect(q){
+  const arr=loadIncorrect(activeSetId), key=incorrectKey(q);
+  const existing=arr.find(x=>x.key===key);
+  if(!existing) return;
+  existing.streak=(existing.streak||0)+1;
+  if(existing.streak>=2) arr.splice(arr.findIndex(x=>x.key===key),1); // cleared after 2 correct in a row
+  saveIncorrect(activeSetId,arr);
+}
+
 function migrateLegacy(){
   const old=localStorage.getItem('qforge_qs'); if(!old) return;
   if(loadSets().length) return;
@@ -708,7 +764,9 @@ function goHome(){
 function renderHeader(){
   const hr=document.getElementById('headerRight');
   if(activeSetId){
-    hr.innerHTML=`<button class="btn btn-primary btn-sm" onclick="startQuiz()">▶ Quiz</button>`;
+    const inc=loadIncorrect(activeSetId);
+    const incBtn=inc.length?`<button class="btn btn-ghost btn-sm" onclick="startIncorrectQuiz()" style="color:var(--red);border-color:rgba(255,82,82,.4)">❌ ${inc.length}</button>`:'';
+    hr.innerHTML=`${incBtn}<button class="btn btn-ghost btn-sm" onclick="quickQuiz(10)" style="color:var(--accent);border-color:rgba(0,229,255,.4)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
   } else { hr.innerHTML=''; }
 }
 
@@ -800,11 +858,13 @@ function flagKey(q){ return q.text.trim(); }
 function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
 function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
 function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); renderQList(); }
+function clearIncorrect(){ if(!confirm('Clear all incorrect tracking for this set?')) return; saveIncorrect(activeSetId,[]); renderQList(); renderHeader(); }
 
 function setFilter(f){
   qFilter=f;
   document.getElementById('chipAll').classList.toggle('active',f==='all');
   document.getElementById('chipFlagged').classList.toggle('active',f==='flagged');
+  document.getElementById('chipIncorrect').classList.toggle('active',f==='incorrect');
   renderQList();
 }
 
@@ -813,22 +873,31 @@ function setFilter(f){
 // ═══════════════════════════════════════════════════
 function renderQList(){
   const fc=questions.filter(isFlagged).length;
+  const ic=loadIncorrect(activeSetId).length;
   document.getElementById('qCount').textContent=questions.length;
   document.getElementById('flagCount').textContent=fc;
+  document.getElementById('incorrectCount').textContent=ic;
   const list=document.getElementById('qList');
   const shown=qFilter==='flagged'
     ? questions.map((q,i)=>({q,i})).filter(({q})=>isFlagged(q))
+    : qFilter==='incorrect'
+    ? questions.map((q,i)=>({q,i})).filter(({q})=>isIncorrect(q))
     : questions.map((q,i)=>({q,i}));
   if(!shown.length){
-    list.innerHTML=`<div class="empty-state"><div class="icon">${qFilter==='flagged'?'🚩':'📭'}</div>${qFilter==='flagged'?'No flagged questions.':'No questions yet.'}</div>`;
+    const msg=qFilter==='flagged'?'No flagged questions.':qFilter==='incorrect'?'No recent incorrect questions. Keep it up!':'No questions yet.';
+    const icon=qFilter==='flagged'?'🚩':qFilter==='incorrect'?'✅':'📭';
+    list.innerHTML=`<div class="empty-state"><div class="icon">${icon}</div>${msg}</div>`;
     return;
   }
   list.innerHTML=shown.map(({q,i})=>{
-    const fl=isFlagged(q);
-    return `<div class="q-item${fl?' is-flagged':''}">
+    const fl=isFlagged(q), inc=isIncorrect(q);
+    const incData=loadIncorrect(activeSetId).find(x=>x.key===incorrectKey(q));
+    const streakTip=incData?`${incData.streak}/2 correct`:'';
+    return `<div class="q-item${fl?' is-flagged':''}${inc?' is-incorrect':''}">
       <div class="q-item-text" onclick="openEditModal(${i})">${esc(q.text.slice(0,80))}${q.text.length>80?'…':''}</div>
       <div class="q-item-right">
         <div class="q-item-badges">
+          ${inc?`<span class="q-item-badge" style="background:rgba(255,82,82,.12);color:var(--red);border-color:rgba(255,82,82,.25)" title="${streakTip}">❌ ${streakTip}</span>`:''}
           ${fl?'<span class="q-item-badge flag-badge">🚩</span>':''}
           <span class="q-item-badge${q.type==='multi'?' multi':''}">${q.type==='multi'?'Multi':'Single'}</span>
         </div>
@@ -970,7 +1039,53 @@ function exportCurrentSet(){
   const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions,flaggedKeys};
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
-function openExportModal(){
+function openPreQuizModal(){
+  // Build a summary of current quiz settings
+  const shuffle=document.getElementById('settShuffle').checked;
+  const shuffleOpts=document.getElementById('settShuffleOpts').checked;
+  const limit=parseInt(document.getElementById('settQLimit').value)||0;
+  const feedback=document.getElementById('settFeedback').checked;
+  const explain=document.getElementById('settExplain').checked;
+  const flaggedOnly=document.getElementById('settFlaggedOnly').checked;
+  const timer=parseInt(document.getElementById('settQTimer').value)||0;
+  const autoAdv=document.getElementById('settAutoAdvance').checked;
+
+  // Count available questions
+  let pool=questions;
+  if(flaggedOnly) pool=pool.filter(isFlagged);
+  const available=pool.length;
+  const willAsk=limit>0&&limit<available?limit:available;
+
+  const row=(icon,label,val,highlight)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+      <span style="font-size:.82rem;color:var(--muted)">${icon} ${label}</span>
+      <span style="font-size:.82rem;font-weight:700;color:${highlight||'var(--text)'}">${val}</span>
+    </div>`;
+
+  document.getElementById('preQuizSummary').innerHTML=
+    row('📝','Questions',`${willAsk}${willAsk<available?' of '+available:''}${flaggedOnly?' (flagged only)':''}`, willAsk===0?'var(--red)':'var(--accent)')+
+    row('🔀','Shuffle',shuffle?'On':'Off', shuffle?'var(--green)':'var(--muted)')+
+    row('⚡','Feedback',feedback?'Instant':'Off', feedback?'var(--green)':'var(--muted)')+
+    row('⏱','Timer per Q',timer?timer+'s':'Off', timer?'var(--orange)':'var(--muted)')+
+    (timer?row('⏭','Auto-advance',autoAdv?'On':'Off'):'');
+
+  document.getElementById('preQuizModal').style.display='flex';
+}
+function closePreQuizModal(e){
+  if(e&&e.target!==document.getElementById('preQuizModal')) return;
+  document.getElementById('preQuizModal').style.display='none';
+}
+function openQuizOptsModal(){
+  document.getElementById('quizOptsModal').style.display='flex';
+}
+function closeQuizOptsModal(e){
+  if(e&&e.target!==document.getElementById('quizOptsModal')) return;
+  document.getElementById('quizOptsModal').style.display='none';
+  // If we're inside a set, refresh the pre-quiz modal summary
+  if(activeSetId) openPreQuizModal();
+}
+
+
   const sets=loadSets();
   if(!sets.length) return showHomeMsg('No sets to export.',false);
   const list=document.getElementById('exportSetList');
@@ -1087,6 +1202,7 @@ function updateQTimer(){
 function onTimeout(){
   if(answered) return; answered=true; quiz.timeouts++;
   const q=quiz.questions[quiz.idx];
+  markIncorrect(q); renderHeader();
   document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
   const fb=document.getElementById('feedbackBox'); fb.style.display='block'; fb.className='feedback-box show timeout-fb';
   document.getElementById('fbTitle').textContent="⏱ Time's up!";
@@ -1137,7 +1253,9 @@ function submitAnswer(){
   clearInterval(qInterval); answered=true;
   const q=quiz.questions[quiz.idx];
   const isCorrect=[...q.correct].sort().join(',')===[...quiz.selected].sort().join(',');
-  if(isCorrect) quiz.score++;
+  if(isCorrect){ quiz.score++; markCorrect(q); }
+  else { markIncorrect(q); }
+  renderHeader();
   if(document.getElementById('settFeedback').checked){
     document.querySelectorAll('.choice-btn').forEach((btn,i)=>{ btn.disabled=true; if(q.correct.includes(i)) btn.classList.add('correct'); else if(quiz.selected.includes(i)) btn.classList.add('wrong'); });
     const fb=document.getElementById('feedbackBox'); fb.style.display='block';
@@ -1148,6 +1266,32 @@ function submitAnswer(){
   document.getElementById('scoreDisplay').textContent=quiz.score;
   const sb=document.getElementById('submitBtn'), isLast=quiz.idx>=quiz.questions.length-1;
   sb.textContent=isLast?'See Results →':'Next →'; sb.onclick=nextQuestion;
+}
+function quickQuiz(n){
+  if(!questions.length) return alert('No questions in this set.');
+  let pool=[...questions].sort(()=>Math.random()-.5).slice(0,n);
+  if(document.getElementById('settShuffleOpts').checked){
+    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+  }
+  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0};
+  answered=false; overallSec=0; clearInterval(overallInterval);
+  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
+  showView('quiz'); renderQuestion();
+}
+function startIncorrectQuiz(){
+  const inc=loadIncorrect(activeSetId);
+  if(!inc.length) return alert('No recent incorrect questions!');
+  const incKeys=new Set(inc.map(x=>x.key));
+  let pool=questions.filter(q=>incKeys.has(incorrectKey(q)));
+  if(!pool.length) return alert('Incorrect questions not found in this set.');
+  pool.sort(()=>Math.random()-.5);
+  if(document.getElementById('settShuffleOpts').checked){
+    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+  }
+  quiz={questions:pool,idx:0,score:0,selected:[],timeouts:0,isIncorrectMode:true};
+  answered=false; overallSec=0; clearInterval(overallInterval);
+  overallInterval=setInterval(()=>{ overallSec++; updateOverallTimer(); },1000);
+  showView('quiz'); renderQuestion();
 }
 function nextQuestion(){ quiz.idx++; if(quiz.idx>=quiz.questions.length){showResults();return;} renderQuestion(); }
 function showResults(){
@@ -1162,6 +1306,11 @@ function showResults(){
   document.getElementById('rTotal').textContent=total;
   const m=Math.floor(overallSec/60), s=overallSec%60;
   document.getElementById('rTime').textContent=`${m}m ${s}s`;
+  // Show Review Incorrect button if there are any
+  const incCount=loadIncorrect(activeSetId).length;
+  const incBtn=document.getElementById('retakeIncorrectBtn');
+  if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
+  if(incBtn) incBtn.textContent=`❌ Review Incorrect (${incCount})`;
   const flagged=quiz.questions.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
