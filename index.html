@@ -477,7 +477,6 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
   <!-- ═══ SETS HOME ═══ -->
   <div id="view-home" class="view active">
     <div class="sets-header">
-      <h2>Your Question Sets</h2>
       <div class="sets-header-actions">
         <div style="position:relative;display:inline-block">
           <button class="btn btn-ghost btn-sm" onclick="toggleHomeMenu(event)">⚙ Menu</button>
@@ -490,7 +489,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
             </div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="openQuick10Modal()">⚡ Quick 10</button>
+        <button class="btn btn-ghost-accent btn-sm" onclick="openQuick10Modal()">⚡ Quick 10</button>
         <button class="btn btn-primary btn-sm" onclick="openQuizOptsModal()">▶ Quiz</button>
       </div>
     </div>
@@ -1736,7 +1735,7 @@ function exportCurrentSet(){
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
 function openPreQuizModal(){
-  // If no set is loaded, show a set picker instead of question count
+  // If no set is loaded, show a set picker
   if(!activeSetId){
     const sets = loadSets().filter(s => loadQs(s.id).length > 0);
     if(!sets.length){
@@ -1744,11 +1743,11 @@ function openPreQuizModal(){
         `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;color:var(--muted)">No sets with questions yet. Add questions to a set first.</div>`;
     } else {
       document.getElementById('preQuizSummary').innerHTML =
-        `<div style="margin-bottom:4px">
+        `<div>
           <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Select a Set</div>
           <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto">
             ${sets.map(s=>`
-              <button onclick="pickSetForQuiz('${s.id}')" style="text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              <button onclick="pickSetForQuiz('${s.id}')" style="text-align:left;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;width:100%;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
                 <span style="font-weight:600">${esc(s.name)}</span>
                 <span style="color:var(--muted);font-size:.75rem;margin-left:8px">${loadQs(s.id).length} questions</span>
               </button>`).join('')}
@@ -1756,9 +1755,10 @@ function openPreQuizModal(){
         </div>`;
     }
     modalOpen('preQuizModal');
-
     return;
   }
+  const set = loadSets().find(s => s.id === activeSetId);
+  const setName = set ? set.name : '';
   const flaggedOnly = document.getElementById('settFlaggedOnly').checked;
   const limit = parseInt(document.getElementById('settQLimit').value)||0;
   let pool = questions;
@@ -1766,12 +1766,14 @@ function openPreQuizModal(){
   const available = pool.length;
   const willAsk = limit > 0 && limit < available ? limit : available;
   const color = willAsk === 0 ? 'var(--red)' : 'var(--accent)';
-  const label = willAsk === 0 ? 'No questions available' :
+  const countLabel = willAsk === 0 ? 'No questions available' :
     `${willAsk}${willAsk < available ? ' of ' + available : ''} question${willAsk !== 1 ? 's' : ''}${flaggedOnly ? ' · flagged only' : ''}`;
   document.getElementById('preQuizSummary').innerHTML =
-    `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:${color}">${label}</div>`;
+    `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+      ${setName ? `<div style="font-size:.75rem;color:var(--muted);margin-bottom:4px">${esc(setName)}</div>` : ''}
+      <div style="font-size:.85rem;font-weight:700;color:${color}">${countLabel}</div>
+    </div>`;
   modalOpen('preQuizModal');
-
 }
 function pickSetForQuiz(id){
   const set = loadSets().find(s => s.id === id);
@@ -1798,48 +1800,46 @@ function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
   modalClose('importExportModal');
 }
+let _q10SelectedId = null;
 function openQuick10Modal(withinSet){
   const sets = loadSets().filter(s => loadQs(s.id).length > 0);
   const list = document.getElementById('quick10SetList');
-  let selectedId = activeSetId || (sets.length ? sets[0].id : null);
+  _q10SelectedId = activeSetId || (sets.length ? sets[0].id : null);
   function render(){
     list.innerHTML = sets.map(s => `
-      <button onclick="q10Select('${s.id}')" id="q10btn_${s.id}" style="text-align:left;background:var(--surface2);border:2px solid ${s.id===selectedId?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;transition:border-color .15s;width:100%">
+      <button onclick="_q10SelectedId='${s.id}';q10Highlight()" style="text-align:left;background:var(--surface2);border:2px solid ${s.id===_q10SelectedId?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px 14px;color:var(--text);font-family:'Sora',sans-serif;font-size:.85rem;cursor:pointer;transition:border-color .15s;width:100%" id="q10btn_${s.id}">
         <span style="font-weight:600">${esc(s.name)}</span>
         <span style="color:var(--muted);font-size:.75rem;margin-left:8px">${loadQs(s.id).length} questions</span>
       </button>`).join('');
-    list._selectedId = selectedId;
   }
-  window.q10Select = id => { selectedId = id; render(); };
-  // Hide set picker when launched from within a set
+  window.q10Highlight = () => {
+    document.querySelectorAll('#quick10SetList button').forEach(btn => {
+      btn.style.borderColor = btn.id === 'q10btn_' + _q10SelectedId ? 'var(--accent)' : 'var(--border)';
+    });
+  };
   const setSection = document.getElementById('quick10SetSection');
+  const nameEl = document.getElementById('quick10SetName');
   if(withinSet){
     if(setSection) setSection.style.display = 'none';
-    list._selectedId = activeSetId;
     const set = loadSets().find(s => s.id === activeSetId);
-    const nameEl = document.getElementById('quick10SetName');
     if(nameEl) nameEl.innerHTML = set
       ? `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:16px">${esc(set.name)}</div>`
       : '';
   } else {
     if(setSection) setSection.style.display = '';
-    const nameEl = document.getElementById('quick10SetName');
     if(nameEl) nameEl.innerHTML = '';
     if(!sets.length){
       list.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:8px 0">No sets with questions yet.</div>`;
     } else { render(); }
   }
-
   modalOpen('quick10Modal');
 }
 function closeQuick10Modal(){ modalClose('quick10Modal'); }
 function startQuick10(){
-  const list = document.getElementById('quick10SetList');
-  const id = list._selectedId || (activeSetId);
+  const id = _q10SelectedId || activeSetId;
   if(!id) return;
   const qs = loadQs(id);
   if(!qs.length) return;
-  // Load the set if different from active
   if(id !== activeSetId){
     activeSetId = id;
     questions = qs;
