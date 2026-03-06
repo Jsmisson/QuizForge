@@ -467,7 +467,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.91</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.911</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -2159,9 +2159,14 @@ function exportAll(){
 function importBank(evt){
   const file=evt.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async e=>{
     try{
       const data=JSON.parse(e.target.result); let setsAdded=0,qAdded=0;
+      // If this is a full backup file, route it correctly
+      if(data.type==='fullbackup'){
+        showHomeMsg('✗ This is a full backup file — use "Restore Full Backup" instead.',false);
+        evt.target.value=''; return;
+      }
       if(data.sets&&Array.isArray(data.sets)){
         const existing=loadSets(), existingFolders=loadFolders();
         const folderIdMap={};
@@ -2192,11 +2197,12 @@ function importBank(evt){
         if(Array.isArray(data.incorrectTracking)) saveIncorrect(newId,data.incorrectTracking);
         saveSets(existing);
         showHomeMsg(`✓ Created "${name}" with ${data.questions.length} question(s).`,true);
-      } else throw new Error();
+      } else throw new Error('No recognisable sets or questions found in file.');
       renderSetsGrid();
-    }catch(err){ showHomeMsg('✗ Invalid file.',false); }
+    }catch(err){ showHomeMsg('✗ Import failed: '+err.message,false); }
     evt.target.value='';
   };
+  reader.onerror=()=>{ showHomeMsg('✗ Could not read file — try again.',false); evt.target.value=''; };
   reader.readAsText(file);
 }
 function exportFullBackup(){
@@ -2266,9 +2272,10 @@ function importFullBackup(evt){
       }
       showHomeMsg(`✓ Backup restored — ${newSets.length} set(s) loaded.`,true);
       renderSetsGrid();
-    }catch(err){ showHomeMsg('✗ '+err.message,false); }
+    }catch(err){ showHomeMsg('✗ Restore failed: '+err.message,false); }
     evt.target.value='';
   };
+  reader.onerror=()=>{ showHomeMsg('✗ Could not read file — try again.',false); evt.target.value=''; };
   reader.readAsText(file);
 }
 function dlBlob(content,filename){
