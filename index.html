@@ -132,7 +132,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
 /* ══ QUESTION EDITOR ══ */
 .q-form{display:flex;flex-direction:column;gap:14px}
-.q-form label{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px}
+.q-form label,.q-form-label{font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:4px}
 .q-form input,.q-form textarea,.q-form select{
   width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
   color:var(--text);font-family:'Sora',sans-serif;font-size:1rem;padding:12px 14px;outline:none;
@@ -527,43 +527,43 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       </div>
     </div>
 
-    <!-- ADD -->
+    <!-- ADD -->\
     <div id="view-add" class="view">
       <div class="card">
         <div class="card-title">Add New Question</div>
         <div class="q-form">
           <div>
-            <label>Question Type</label>
-            <select id="newQType" onchange="updateOptionControls()">
+            <label for="newQType">Question Type</label>
+            <select id="newQType" name="newQType" onchange="updateOptionControls()">
               <option value="single">Single answer (pick 1)</option>
               <option value="multi">Multiple answers (pick 2+)</option>
               <option value="card">Flashcard (term / definition)</option>
             </select>
           </div>
-          <div id="newQTextWrap"><label>Question Text</label><textarea id="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
+          <div id="newQTextWrap"><label for="newQText">Question Text</label><textarea id="newQText" name="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
           <!-- MC fields -->
           <div id="newQMcFields">
             <div>
-              <label>Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></label>
+              <div class="q-form-label">Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></div>
               <div class="options-builder" id="optionsBuilder"></div>
               <button class="add-option-btn" onclick="addOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
             </div>
           </div>
           <!-- Flashcard fields -->
           <div id="newQCardFields" style="display:none">
-            <div><label>Term</label><textarea id="newQTerm" placeholder="Term or concept..." rows="2"></textarea></div>
-            <div style="margin-top:10px"><label>Definition</label><textarea id="newQDef" placeholder="Definition or explanation..." rows="3"></textarea></div>
+            <div><label for="newQTerm">Term</label><textarea id="newQTerm" name="newQTerm" placeholder="Term or concept..." rows="2"></textarea></div>
+            <div style="margin-top:10px"><label for="newQDef">Definition</label><textarea id="newQDef" name="newQDef" placeholder="Definition or explanation..." rows="3"></textarea></div>
           </div>
-          <div><label>Explanation (optional)</label><input type="text" id="newQExplain" placeholder="Shown after answering..."></div>
+          <div><label for="newQExplain">Explanation (optional)</label><input type="text" id="newQExplain" name="newQExplain" placeholder="Shown after answering..."></div>
           <div>
-            <label>Image (optional)</label>
+            <label for="newQImgUpload">Image (optional)</label>
             <div id="newQImgPreview" class="img-preview-wrap" style="display:none">
               <img id="newQImgThumb" src="" alt="Question image">
               <button type="button" class="img-remove-btn" onclick="removeNewQImg()" title="Remove image">✕</button>
             </div>
-            <label class="img-upload-area" id="newQImgUploadArea">
+            <label class="img-upload-area" id="newQImgUploadArea" for="newQImgUpload">
               🖼 Click to attach an image
-              <input type="file" accept="image/*" style="display:none" onchange="handleNewQImg(event)">
+              <input type="file" id="newQImgUpload" name="newQImgUpload" accept="image/*" style="display:none" onchange="handleNewQImg(event)">
             </label>
           </div>
           <div class="form-actions">
@@ -737,12 +737,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-title">➕ New Set</div>
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:4px">
       <div>
-        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Set Name</label>
-        <input type="text" id="newSetName" placeholder="e.g. Network+, CompTIA Security+" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+        <label for="newSetName" style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Set Name</label>
+        <input type="text" id="newSetName" name="newSetName" placeholder="e.g. Network+, CompTIA Security+" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
       </div>
       <div>
-        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Folder (optional)</label>
-        <select id="newSetFolder" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+        <label for="newSetFolder" style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Folder (optional)</label>
+        <select id="newSetFolder" name="newSetFolder" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
           <option value="">— No folder —</option>
         </select>
         <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:.72rem" onclick="openFolderManagerModal()">📁 Manage Folders</button>
@@ -861,12 +861,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
         <div style="font-weight:700;margin-bottom:2px">📋 Import Set(s)</div>
         <div style="font-size:.75rem;color:var(--muted)">Add sets from a .json export file</div>
-        <input type="file" accept=".json" style="display:none" onchange="closeImportExportModal();importBank(event)">
+        <input type="file" id="importBankFile" name="importBankFile" accept=".json" style="display:none" onchange="closeImportExportModal();importBank(event)">
       </label>
       <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
         <div style="font-weight:700;margin-bottom:2px">💾 Restore Full Backup</div>
         <div style="font-size:.75rem;color:var(--muted);color:var(--red)">⚠ Replaces ALL current data</div>
-        <input type="file" accept=".json" style="display:none" onchange="closeImportExportModal();importFullBackup(event)">
+        <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" onchange="closeImportExportModal();importFullBackup(event)">
       </label>
     </div>
   </div>
@@ -895,10 +895,10 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Edit Question</div>
     <div class="q-form">
-      <div><label>Question Text</label><textarea id="editQText" rows="3"></textarea></div>
+      <div><label for="editQText">Question Text</label><textarea id="editQText" name="editQText" rows="3"></textarea></div>
       <div>
-        <label>Answer Type</label>
-        <select id="editQType" onchange="updateEditOptionControls()">
+        <label for="editQType">Answer Type</label>
+        <select id="editQType" name="editQType" onchange="updateEditOptionControls()">
           <option value="single">Single answer</option>
           <option value="multi">Multiple answers</option>
           <option value="card">Flashcard</option>
@@ -907,26 +907,26 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <!-- MC fields -->
       <div id="editQMcFields">
         <div>
-          <label>Answer Choices</label>
+          <div class="q-form-label">Answer Choices</div>
           <div class="options-builder" id="editOptionsBuilder"></div>
           <button class="add-option-btn" onclick="addEditOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
         </div>
       </div>
       <!-- Flashcard fields -->
       <div id="editQCardFields" style="display:none">
-        <div><label>Term</label><textarea id="editQTerm" rows="2"></textarea></div>
-        <div style="margin-top:10px"><label>Definition</label><textarea id="editQDef" rows="3"></textarea></div>
+        <div><label for="editQTerm">Term</label><textarea id="editQTerm" name="editQTerm" rows="2"></textarea></div>
+        <div style="margin-top:10px"><label for="editQDef">Definition</label><textarea id="editQDef" name="editQDef" rows="3"></textarea></div>
       </div>
-      <div><label>Explanation (optional)</label><input type="text" id="editQExplain"></div>
+      <div><label for="editQExplain">Explanation (optional)</label><input type="text" id="editQExplain" name="editQExplain"></div>
       <div>
-        <label>Image (optional)</label>
+        <label for="editQImgUpload">Image (optional)</label>
         <div id="editQImgPreview" class="img-preview-wrap" style="display:none">
           <img id="editQImgThumb" src="" alt="Question image">
           <button type="button" class="img-remove-btn" onclick="removeEditQImg()" title="Remove image">✕</button>
         </div>
-        <label class="img-upload-area" id="editQImgUploadArea">
+        <label class="img-upload-area" id="editQImgUploadArea" for="editQImgUpload">
           🖼 Click to attach an image
-          <input type="file" accept="image/*" style="display:none" onchange="handleEditQImg(event)">
+          <input type="file" id="editQImgUpload" name="editQImgUpload" accept="image/*" style="display:none" onchange="handleEditQImg(event)">
         </label>
       </div>
     </div>
@@ -1368,7 +1368,7 @@ function deleteCurrentSet(){ if(activeSetId) deleteSet(activeSetId); }
 function startRenameCard(id){
   const nameEl=document.getElementById('sname-'+id);
   const orig=nameEl.textContent;
-  nameEl.innerHTML=`<input class="set-name-input" value="${esc(orig)}" onblur="finishRenameCard('${id}',this)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${esc(orig)}';this.blur()}">`;
+  nameEl.innerHTML=`<input id="renameInput" name="renameInput" class="set-name-input" value="${esc(orig)}" onblur="finishRenameCard('${id}',this)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${esc(orig)}';this.blur()}">`;
   nameEl.querySelector('input').focus();
 }
 function finishRenameCard(id,inp){
@@ -1474,8 +1474,10 @@ function updateOptionControls(){
 function addOptionRow(){
   const b=document.getElementById('optionsBuilder');
   const t=document.getElementById('newQType').value==='multi'?'checkbox':'radio';
+  const idx=b.children.length;
+  const uid_opt='opt_new_'+idx+'_'+Date.now();
   const d=document.createElement('div'); d.className='option-row';
-  d.innerHTML=`<input type="${t}" class="opt-correct-input" name="correct"><input type="text" class="opt-text" placeholder="Answer option..."><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  d.innerHTML=`<input type="${t}" id="${uid_opt}" class="opt-correct-input" name="correct" aria-label="Mark option ${idx+1} as correct"><input type="text" class="opt-text" placeholder="Answer option..." aria-label="Option ${idx+1} text"><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0" aria-label="Remove option">✕</button>`;
   b.appendChild(d);
 }
 function cancelEdit(){
@@ -1584,8 +1586,10 @@ function updateEditOptionControls(){
 function addEditOptionRow(){
   const b=document.getElementById('editOptionsBuilder');
   const t=document.getElementById('editQType').value==='multi'?'checkbox':'radio';
+  const idx=b.children.length;
+  const uid_opt='opt_edit_'+idx+'_'+Date.now();
   const d=document.createElement('div'); d.className='option-row';
-  d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"><input type="text" class="edit-opt-text" placeholder="Answer option..."><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  d.innerHTML=`<input type="${t}" id="${uid_opt}" class="edit-opt-correct" name="editcorrect" aria-label="Mark option ${idx+1} as correct"><input type="text" class="edit-opt-text" placeholder="Answer option..." aria-label="Option ${idx+1} text"><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0" aria-label="Remove option">✕</button>`;
   b.appendChild(d);
 }
 function saveEditQuestion(){
@@ -1722,6 +1726,7 @@ function closePreQuizModal(e){
 }
 function openImportExportModal(){
   modalOpen('importExportModal');
+  try{ GDRIVE._renderBar(); } catch(e){}
 }
 function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
@@ -2551,6 +2556,9 @@ function init(){
   try{ renderSetsGrid(); } catch(e){ console.log('grid err',e); }
   try{ renderHeader(); } catch(e){}
   try{ initOptionRows(); } catch(e){}
+  // Init Google Drive sync strip (token restore + strip render)
+  // syncBarWrap is inside modal so rendered on modal open instead
+  setTimeout(()=>{ try{ GDRIVE.initSync(); } catch(e){} }, 0);
 }
 
 if(document.readyState === 'loading'){
@@ -2870,15 +2878,8 @@ const GDRIVE = (() => {
     }
   }
 
-  return { signIn, signOut, syncNow, initSync };
+  return { signIn, signOut, syncNow, initSync, _renderBar };
 })();
-
-// Kick off sync init after app init
-const _origInit = window.init;
-window.init = function(){
-  _origInit();
-  GDRIVE.initSync();
-};
 </script>
 </body>
 </html>
