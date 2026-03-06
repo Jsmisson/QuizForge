@@ -2744,10 +2744,12 @@ const GDRIVE = (() => {
   // ── Drive file helpers (appDataFolder — private to this app) ──
   async function _findFile(){
     const r = await fetch(
-      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id)`,
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D%27${FILE_NAME}%27&fields=files(id,name)`,
       { headers: { Authorization: 'Bearer ' + _token } }
     );
     const d = await r.json();
+    console.log('[QuizForge Sync] findFile response:', d);
+    if(d.error){ throw new Error('findFile: ' + d.error.message); }
     return (d.files && d.files.length) ? d.files[0].id : null;
   }
 
@@ -2756,16 +2758,25 @@ const GDRIVE = (() => {
       `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
       { headers: { Authorization: 'Bearer ' + _token } }
     );
-    return r.json();
+    if(!r.ok){ throw new Error('readFile HTTP ' + r.status); }
+    const d = await r.json();
+    console.log('[QuizForge Sync] readFile sets count:', d && d.sets ? d.sets.length : 'n/a');
+    return d;
   }
 
   async function _writeFile(id, payload){
     const body = JSON.stringify(payload);
-    const url = id
-      ? `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`
-      : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    console.log('[QuizForge Sync] writeFile id:', id, 'sets:', payload.sets ? payload.sets.length : 0);
     if(id){
-      return fetch(url, { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type':MIME }, body });
+      // Update existing file
+      const r = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`,
+        { method:'PATCH', headers:{ Authorization:'Bearer '+_token, 'Content-Type':MIME }, body }
+      );
+      const d = await r.json();
+      console.log('[QuizForge Sync] writeFile update response:', d);
+      if(d.error){ throw new Error('writeFile update: ' + d.error.message); }
+      return d;
     }
     // Create new file in appDataFolder
     const meta = JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] });
@@ -2777,6 +2788,8 @@ const GDRIVE = (() => {
       { method:'POST', headers:{ Authorization:'Bearer '+_token }, body: form }
     );
     const d = await r.json();
+    console.log('[QuizForge Sync] writeFile create response:', d);
+    if(d.error){ throw new Error('writeFile create: ' + d.error.message); }
     return d;
   }
 
@@ -2846,14 +2859,14 @@ const GDRIVE = (() => {
       // 1. Find or create cloud file
       if(!_fileId) _fileId = await _findFile();
 
-      // 2. Pull cloud → merge into local (writes directly to localStorage, no scheduleSync)
+      // 2. Pull cloud → merge into local
       if(_fileId){
         const cloudData = await _readFile(_fileId);
         _applyPayload(cloudData);
         try{ renderSetsGrid(); } catch(e){}
       }
 
-      // 3. Push fully merged local state back to cloud
+      // 3. Push merged local state back to cloud
       const payload = _buildPayload();
       const result  = await _writeFile(_fileId, payload);
       if(!_fileId && result && result.id) _fileId = result.id;
@@ -2862,8 +2875,16 @@ const GDRIVE = (() => {
       _setStatus('Synced ' + t, 'ok');
       localStorage.setItem('qforge_gdrive_lastSync', Date.now());
     } catch(e){
-      console.error('Drive sync error', e);
-      _setStatus('Sync failed', 'err');
+      console.error('[QuizForge Sync] syncNow error:', e.message);
+      // Token likely expired — clear it and prompt re-sign-in
+      if(e.message && (e.message.includes('401') || e.message.includes('Invalid Credentials') || e.message.includes('invalid_token'))){
+        _token = null;
+        localStorage.removeItem('qforge_gdrive_token');
+        _setStatus('Session expired — please sign in again', 'err');
+        _renderBar();
+      } else {
+        _setStatus('Sync failed: ' + e.message, 'err');
+      }
     } finally {
       _syncing = false;
     }
