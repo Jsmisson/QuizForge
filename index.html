@@ -468,7 +468,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="logo-wrap">
       <div style="display:flex;align-items:baseline;gap:7px">
         <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
-        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.94</span>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px">v0.95</span>
       </div>
       <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
         <div class="sstrip-dot" id="sstripDot"></div>
@@ -878,6 +878,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" onchange="closeBackupModal();importFullBackup(event)">
       </label>
     </div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 0 8px">Troubleshooting</div>
+    <button class="btn btn-danger" style="width:100%;text-align:left;padding:14px 16px" onclick="closeBackupModal();clearLocalAndResync()">
+      <div style="font-weight:700;margin-bottom:2px">🗑 Clear Local Data &amp; Re-sync</div>
+      <div style="font-size:.75rem;opacity:.8">Wipes this device's local storage and pulls a fresh copy from Google Drive. Use if sync is stuck or quota errors persist. Does not affect Drive data.</div>
+    </button>
   </div>
 </div>
 
@@ -2049,6 +2055,26 @@ function startQuick10(){
 }
 function openBackupModal(){ modalOpen('backupModal'); }
 function closeBackupModal(){ modalClose('backupModal'); }
+
+function clearLocalAndResync(){
+  if(!confirm('This will wipe ALL local data on this device and pull a fresh copy from Google Drive.\n\nYour Drive data is untouched. Continue?')) return;
+  // Check Google Drive is connected before nuking local data
+  if(!window.GDRIVE || !localStorage.getItem('qforge_gdrive_token')){
+    alert('Not connected to Google Drive. Connect first so data can be restored after the wipe.');
+    return;
+  }
+  // Clear every qforge key from localStorage
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('qforge_'));
+  keys.forEach(k => localStorage.removeItem(k));
+  // Reset in-memory state
+  sets = []; questions = []; flaggedKeys = []; activeSetId = null;
+  try{ renderSetsGrid(); } catch(e){}
+  showHomeMsg('✓ Local data cleared — pulling from Drive…', true);
+  // Force a fresh sync — re-reads token from storage first
+  setTimeout(() => {
+    try{ GDRIVE.initSync(); } catch(e){ showHomeMsg('✗ Sync failed: ' + e.message, false); }
+  }, 300);
+}
 function openOrganizeModal(){
   renderOrganizeList();
   modalOpen('organizeModal');
