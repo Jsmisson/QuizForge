@@ -481,9 +481,13 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <div class="sets-header-actions">
         <div style="position:relative;display:inline-block">
           <button class="btn btn-ghost btn-sm" onclick="toggleHomeMenu(event)">⚙ Menu</button>
-          <div id="homeMenu" style="display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:170px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+          <div id="homeMenu" style="display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:190px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
             <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openOrganizeModal()">⠿ Organize</button>
             <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" onclick="closeHomeMenu();openBackupModal()">📦 Backup</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px">
+              <span style="font-size:.82rem">🔊 Sound</span>
+              <label class="toggle" style="margin:0"><input type="checkbox" id="menuSound" onchange="toggleSound()"><span class="toggle-slider"></span></label>
+            </div>
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="openQuick10Modal()">⚡ Quick 10</button>
@@ -795,7 +799,6 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">0 = all questions</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
     <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
-    <div class="settings-row"><div><div class="s-lbl">Sound Effects</div><div class="s-desc">Chime on correct, ding on incorrect</div></div><label class="toggle"><input type="checkbox" id="settSound" onchange="toggleSound()"><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Flagged Only</div><div class="s-desc">Restrict to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly" onchange="openPreQuizModal()"><span class="toggle-slider"></span></label></div>
 
     <!-- Advanced expander -->
@@ -876,11 +879,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">⚡ Quick 10</div>
     <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px">10 random questions, shuffled — no setup needed.</div>
+    <div id="quick10SetName"></div>
 
+    <div id="quick10SetSection">
     <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Set</div>
     <div id="quick10SetList" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px"></div>
-
-    <div class="settings-row" style="margin-bottom:0"><div><div class="s-lbl">Sound Effects</div></div><label class="toggle"><input type="checkbox" id="quick10Sound" onchange="localStorage.setItem('qforge_sound',this.checked?'on':'off')"><span class="toggle-slider"></span></label></div>
+    </div>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeQuick10Modal()">Cancel</button>
@@ -1193,7 +1197,7 @@ function renderHeader(){
   if(activeSetId){
     const inc=loadIncorrect(activeSetId);
     const incBtn=inc.length?`<button class="btn btn-ghost-red btn-sm" onclick="startIncorrectQuiz()">❌ Review (${inc.length})</button>`:'';
-    hr.innerHTML=`${incBtn}<button class="btn btn-ghost-accent btn-sm" onclick="quickQuiz(10)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
+    hr.innerHTML=`${incBtn}<button class="btn btn-ghost-accent btn-sm" onclick="openQuick10Modal(true)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
   } else { hr.innerHTML=''; }
 }
 
@@ -1752,7 +1756,7 @@ function openPreQuizModal(){
         </div>`;
     }
     modalOpen('preQuizModal');
-    _updateSoundToggle();
+
     return;
   }
   const flaggedOnly = document.getElementById('settFlaggedOnly').checked;
@@ -1767,7 +1771,7 @@ function openPreQuizModal(){
   document.getElementById('preQuizSummary').innerHTML =
     `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:${color}">${label}</div>`;
   modalOpen('preQuizModal');
-  _updateSoundToggle();
+
 }
 function pickSetForQuiz(id){
   const set = loadSets().find(s => s.id === id);
@@ -1794,10 +1798,9 @@ function closeImportExportModal(e){
   if(e&&e.target!==document.getElementById('importExportModal')) return;
   modalClose('importExportModal');
 }
-function openQuick10Modal(){
+function openQuick10Modal(withinSet){
   const sets = loadSets().filter(s => loadQs(s.id).length > 0);
   const list = document.getElementById('quick10SetList');
-  // Pre-select active set if one is loaded
   let selectedId = activeSetId || (sets.length ? sets[0].id : null);
   function render(){
     list.innerHTML = sets.map(s => `
@@ -1808,10 +1811,25 @@ function openQuick10Modal(){
     list._selectedId = selectedId;
   }
   window.q10Select = id => { selectedId = id; render(); };
-  if(!sets.length){
-    list.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:8px 0">No sets with questions yet.</div>`;
-  } else { render(); }
-  document.getElementById('quick10Sound').checked = soundEnabled();
+  // Hide set picker when launched from within a set
+  const setSection = document.getElementById('quick10SetSection');
+  if(withinSet){
+    if(setSection) setSection.style.display = 'none';
+    list._selectedId = activeSetId;
+    const set = loadSets().find(s => s.id === activeSetId);
+    const nameEl = document.getElementById('quick10SetName');
+    if(nameEl) nameEl.innerHTML = set
+      ? `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:16px">${esc(set.name)}</div>`
+      : '';
+  } else {
+    if(setSection) setSection.style.display = '';
+    const nameEl = document.getElementById('quick10SetName');
+    if(nameEl) nameEl.innerHTML = '';
+    if(!sets.length){
+      list.innerHTML = `<div style="color:var(--muted);font-size:.82rem;padding:8px 0">No sets with questions yet.</div>`;
+    } else { render(); }
+  }
+
   modalOpen('quick10Modal');
 }
 function closeQuick10Modal(){ modalClose('quick10Modal'); }
@@ -1913,6 +1931,7 @@ function toggleHomeMenu(e){
   const m = document.getElementById('homeMenu');
   m.style.display = m.style.display === 'none' ? '' : 'none';
   if(m.style.display !== 'none'){
+
     setTimeout(()=>document.addEventListener('click', closeHomeMenu, {once:true}), 0);
   }
 }
@@ -2704,7 +2723,7 @@ function toggleSound(){
   _updateSoundToggle();
 }
 function _updateSoundToggle(){
-  const el = document.getElementById('settSound');
+  const el = document.getElementById('menuSound');
   if(el) el.checked = soundEnabled();
 }
 
