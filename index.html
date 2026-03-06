@@ -3453,34 +3453,41 @@ const GDRIVE = (() => {
         console.log('[Sync] adding cloud set locally:', cs.id, cs.name);
         mergedSets.push({ id: cs.id, name: cs.name, folderId: cs.folderId || null, created: cs.created || Date.now() });
       }
-      // Apply cloud content — only overwrite flags/incorrect if cloud is newer than local modification
+
+      // ── Conflict resolution ──────────────────────────────────────────────
+      // lastLocalSync = when this device last successfully pushed to Drive.
+      // setTs.questions = when questions were last modified ON THIS DEVICE.
+      // If questions were modified locally AFTER the last sync, local wins.
+      // Otherwise cloud wins (it's newer or this is a fresh device with no local edits).
+      const lastLocalSync = parseInt(localStorage.getItem('qforge_gdrive_lastSync') || '0');
       const setTs = mergedClearTs[cs.id] || {};
-      const cloudSyncedAt = data.synced ? new Date(data.synced).getTime() : 0;
 
-      // Only overwrite local questions if cloud is newer than last local modification
-      if(!setTs.questions || cloudSyncedAt > setTs.questions){
-        // Never overwrite the currently open set's questions — use in-memory array as source of truth
-        if(typeof activeSetId !== 'undefined' && cs.id === activeSetId){
-          console.log('[Sync] skipping question overwrite for active set:', cs.name);
-        } else {
-          _lsSet('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
-        }
+      const localQsModified  = setTs.questions  || 0;
+      const localFlModified  = setTs.flags      || 0;
+      const localIncModified = setTs.incorrect  || 0;
+
+      // Questions: cloud wins unless local was modified AFTER last successful sync
+      if(localQsModified > lastLocalSync){
+        console.log('[Sync] keeping local questions for', cs.name, '— edited since last sync', new Date(localQsModified).toLocaleTimeString());
+      } else if(typeof activeSetId !== 'undefined' && cs.id === activeSetId){
+        console.log('[Sync] skipping question overwrite for active set:', cs.name);
       } else {
-        console.log('[Sync] keeping local questions for', cs.name, '— modified after cloud sync');
+        _lsSet('qforge_qs_' + cs.id, JSON.stringify(Array.isArray(cs.questions) ? cs.questions : []));
+        console.log('[Sync] applied cloud questions for', cs.name, '(', (cs.questions||[]).length, 'items )');
       }
 
-      // Apply cloud flags only if local flags haven't been modified more recently
-      if(!setTs.flags || cloudSyncedAt > setTs.flags){
+      // Flags: same logic
+      if(localFlModified > lastLocalSync){
+        console.log('[Sync] keeping local flags for', cs.name, '— edited since last sync');
+      } else {
         _lsSet('qforge_flags_' + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys) ? cs.flaggedKeys : []));
-      } else {
-        console.log('[Sync] keeping local flags for', cs.name, '— modified after cloud sync');
       }
 
-      // Apply cloud incorrect only if local incorrect hasn't been modified more recently
-      if(!setTs.incorrect || cloudSyncedAt > setTs.incorrect){
-        _lsSet('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
+      // Incorrect tracking: same logic
+      if(localIncModified > lastLocalSync){
+        console.log('[Sync] keeping local incorrect for', cs.name, '— edited since last sync');
       } else {
-        console.log('[Sync] keeping local incorrect for', cs.name, '— modified after cloud sync');
+        _lsSet('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
       }
 
       if(Array.isArray(cs.srsData)) _lsSet('qforge_srs_' + cs.id, JSON.stringify(cs.srsData));
