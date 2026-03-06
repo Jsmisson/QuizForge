@@ -796,6 +796,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">0 = all questions</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
     <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Sound Effects</div><div class="s-desc">Chime on correct, ding on incorrect</div></div><label class="toggle"><input type="checkbox" id="settSound" onchange="toggleSound()"><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Flagged Only</div><div class="s-desc">Restrict to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly" onchange="openPreQuizModal()"><span class="toggle-slider"></span></label></div>
 
     <!-- Advanced expander -->
@@ -1725,6 +1726,7 @@ function openPreQuizModal(){
   document.getElementById('preQuizSummary').innerHTML =
     `<div style="padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:.85rem;font-weight:700;color:${color}">${label}</div>`;
   modalOpen('preQuizModal');
+  _updateSoundToggle();
 }
 function closePreQuizModal(e){
   if(e&&e.target!==document.getElementById('preQuizModal')) return;
@@ -2169,6 +2171,7 @@ function flipCard(wrap){
   const card=wrap.querySelector('.flip-card');
   card.classList.toggle('flipped');
   if(card.classList.contains('flipped')){
+    SFX.flip();
     const fbDiv=document.getElementById('flashcardBtns');
     if(fbDiv) fbDiv.style.display='flex';
   }
@@ -2189,6 +2192,7 @@ function cardAnswer(gotIt){
     saveIncorrect(activeSetId,arr);
   }
   if(gotIt) markCorrect(q); else markIncorrect(q);
+  if(gotIt) SFX.correct(); else SFX.incorrect();
   // Recalculate score from savedAnswers
   let score=0, wrongs=0;
   Object.values(quiz.savedAnswers).forEach(a=>{ if(a.isCorrect) score++; else wrongs++; });
@@ -2286,6 +2290,7 @@ function submitAnswer(){
     saveIncorrect(activeSetId,arr);
   }
   if(isCorrect) markCorrect(q); else markIncorrect(q);
+  if(isCorrect) SFX.correct(); else SFX.incorrect();
   // Update answerLog (replace entry for this question if re-answering)
   if(quiz.answerLog){
     const key=incorrectKey(q);
@@ -2558,6 +2563,57 @@ function updateHotkeyLegend(isCard){
       ${nav}
       <span class="hk"><kbd>Esc</kbd> Exit</span>`;
   }
+}
+
+// ═══════════════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════════════
+const SFX = (() => {
+  let _ctx = null;
+  function _ctx_get(){ if(!_ctx) _ctx = new (window.AudioContext||window.webkitAudioContext)(); return _ctx; }
+  function _tone(freq, type, vol, dur, freqEnd){
+    if(!soundEnabled()) return;
+    try{
+      const ctx = _ctx_get();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      if(freqEnd) osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + dur);
+      gain.gain.setValueAtTime(vol, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + dur);
+    } catch(e){}
+  }
+  function correct(){
+    // Two-note ascending chime
+    _tone(523, 'sine', 0.18, 0.12);
+    setTimeout(()=>_tone(784, 'sine', 0.15, 0.2), 100);
+  }
+  function incorrect(){
+    // Low descending thud
+    _tone(280, 'sine', 0.22, 0.08);
+    setTimeout(()=>_tone(180, 'sine', 0.18, 0.18), 60);
+  }
+  function flip(){
+    // Soft click for card flip
+    _tone(900, 'sine', 0.06, 0.06);
+  }
+  return { correct, incorrect, flip };
+})();
+
+function soundEnabled(){
+  return localStorage.getItem('qforge_sound') !== 'off';
+}
+function toggleSound(){
+  localStorage.setItem('qforge_sound', soundEnabled() ? 'off' : 'on');
+  _updateSoundToggle();
+}
+function _updateSoundToggle(){
+  const el = document.getElementById('settSound');
+  if(el) el.checked = soundEnabled();
 }
 
 // ═══════════════════════════════════════════════════
