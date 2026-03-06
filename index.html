@@ -164,7 +164,28 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
   letter-spacing:.4px;white-space:nowrap;background:rgba(0,229,255,.12);color:var(--accent);
   border:1px solid rgba(0,229,255,.2);flex-shrink:0}
 .q-item-badge.multi{background:rgba(123,94,167,.2);color:#c084fc;border-color:rgba(123,94,167,.3)}
-.q-item-badge.flag-badge{background:rgba(255,215,64,.12);color:var(--yellow);border-color:rgba(255,215,64,.25)}
+.q-item-badge.card-type{background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.3)}
+
+/* ══ FLASHCARD FLIP ══ */
+.flip-card-wrap{perspective:1000px;width:100%;margin-bottom:16px;cursor:pointer;user-select:none}
+.flip-card{position:relative;width:100%;min-height:160px;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,0,.2,1)}
+.flip-card.flipped{transform:rotateX(180deg)}
+.flip-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 20px;text-align:center;border:1px solid var(--border)}
+.flip-face-front{background:var(--surface2);}
+.flip-face-back{background:rgba(0,229,255,.04);border-color:rgba(0,229,255,.25);transform:rotateX(180deg)}
+.flip-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--muted);margin-bottom:10px}
+.flip-text{font-size:1.05rem;font-weight:600;line-height:1.5;color:var(--text)}
+.flip-tap-hint{font-size:.68rem;color:var(--muted);margin-top:12px;opacity:.7}
+.flip-card-img{max-width:100%;max-height:120px;object-fit:contain;border-radius:8px;margin-bottom:10px}
+.flashcard-btns{display:flex;gap:10px;margin-top:4px}
+.flashcard-btns .btn{flex:1;font-size:.9rem;padding:14px}
+.btn-got-it{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.3);border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-got-it:hover{background:rgba(0,230,118,.22)}
+.btn-missed{background:rgba(255,82,82,.1);color:var(--red);border:1px solid rgba(255,82,82,.25);border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;cursor:pointer;transition:all .15s}
+.btn-missed:hover{background:rgba(255,82,82,.2)}
 .q-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
 .q-item-badges{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
 .q-item-actions{display:flex;gap:4px}
@@ -199,8 +220,10 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 @media(min-width:600px){.modal{border-radius:var(--radius);padding:28px;padding-bottom:28px;animation:fadeIn .2s ease;touch-action:auto}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 body.modal-open{overflow:hidden;position:fixed;width:100%}
-.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;display:block}
-@media(min-width:600px){.modal-handle{display:none}}
+.modal-handle{width:48px;height:5px;background:var(--border);border-radius:3px;margin:0 auto 16px;display:block;touch-action:none;cursor:grab}
+.modal-handle-zone{display:block;width:100%;padding:12px 0 4px;margin:-24px -20px 0;text-align:center;touch-action:none;cursor:grab}
+.modal-handle-zone .modal-handle{margin:0 auto}
+@media(min-width:600px){.modal-handle-zone{display:none}}
 .modal-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:18px}
 .modal-footer{display:flex;gap:10px;margin-top:18px}
 .modal-footer .btn{flex:1}
@@ -440,18 +463,27 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
       <div class="card">
         <div class="card-title">Add New Question</div>
         <div class="q-form">
-          <div><label>Question Text</label><textarea id="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
           <div>
-            <label>Answer Type</label>
+            <label>Question Type</label>
             <select id="newQType" onchange="updateOptionControls()">
               <option value="single">Single answer (pick 1)</option>
               <option value="multi">Multiple answers (pick 2+)</option>
+              <option value="card">Flashcard (term / definition)</option>
             </select>
           </div>
-          <div>
-            <label>Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></label>
-            <div class="options-builder" id="optionsBuilder"></div>
-            <button class="add-option-btn" onclick="addOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+          <div id="newQTextWrap"><label>Question Text</label><textarea id="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
+          <!-- MC fields -->
+          <div id="newQMcFields">
+            <div>
+              <label>Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></label>
+              <div class="options-builder" id="optionsBuilder"></div>
+              <button class="add-option-btn" onclick="addOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+            </div>
+          </div>
+          <!-- Flashcard fields -->
+          <div id="newQCardFields" style="display:none">
+            <div><label>Term</label><textarea id="newQTerm" placeholder="Term or concept..." rows="2"></textarea></div>
+            <div style="margin-top:10px"><label>Definition</label><textarea id="newQDef" placeholder="Definition or explanation..." rows="3"></textarea></div>
           </div>
           <div><label>Explanation (optional)</label><input type="text" id="newQExplain" placeholder="Shown after answering..."></div>
           <div>
@@ -481,6 +513,9 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <span class="hl">Q:</span> Question text<br>
 <span class="hl2">A:</span> Option &nbsp;<span class="hl2">*B:</span> Correct &nbsp;<span class="hl2">C:</span> Option<br>
 <span class="hl">EXPLAIN:</span> Explanation text<br>
+<span style="color:var(--border)">───</span><br>
+<span class="hl" style="color:#34d399">CARD:</span> Term text<br>
+<span class="hl2" style="color:#34d399">DEF:</span> Definition text<br>
 <span style="color:var(--border)">───</span><br>
 <span style="font-size:.65rem;color:var(--muted)">Also: Q1: Q42: [MULTI] (Select two) [SIMULATION]</span>
         </div>
@@ -604,7 +639,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- ORGANIZE MODAL -->
 <div class="modal-overlay" id="organizeModal" style="display:none" onclick="closeOrganizeModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">⠿ Organize</div>
     <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Drag to reorder folders and sets, or use the arrows.</p>
     <div id="organizeList" style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;margin-bottom:12px"></div>
@@ -618,7 +653,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- CREATE SET MODAL -->
 <div class="modal-overlay" id="createSetModal" style="display:none" onclick="closeCreateSetModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">➕ New Set</div>
     <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:4px">
       <div>
@@ -643,7 +678,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- FOLDER MANAGER MODAL -->
 <div class="modal-overlay" id="folderManagerModal" style="display:none" onclick="closeFolderManagerModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">📁 Manage Folders</div>
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <input type="text" id="newFolderName" placeholder="New folder name..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.88rem;padding:8px 12px;outline:none;min-height:var(--tap)">
@@ -659,7 +694,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- EXIT QUIZ MODAL -->
 <div class="modal-overlay" id="exitQuizModal" style="display:none" onclick="closeExitQuizModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:400px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
@@ -673,7 +708,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- PRE-QUIZ MODAL -->
 <div class="modal-overlay" id="preQuizModal" style="display:none" onclick="closePreQuizModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:440px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">▶ Start Quiz</div>
 
     <!-- Settings summary -->
@@ -689,7 +724,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- QUIZ OPTIONS MODAL -->
 <div class="modal-overlay" id="quizOptsModal" style="display:none" onclick="closeQuizOptsModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:500px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">⚙️ Quiz Options</div>
 
     <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Behaviour</div>
@@ -699,6 +734,15 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
     <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div><div class="s-desc">Show correct/wrong after submitting</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display explanation after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
     <div class="settings-row"><div><div class="s-lbl">Flagged Questions Only</div><div class="s-desc">Restrict quiz to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly"><span class="toggle-slider"></span></label></div>
+
+    <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Flashcards</div>
+    <div class="settings-row"><div><div class="s-lbl">Cards Only</div><div class="s-desc">Quiz flashcards only, skip MC questions</div></div><label class="toggle"><input type="checkbox" id="settCardsOnly"><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Show First Side</div><div class="s-desc">Which side shows first for flashcards</div></div>
+      <select id="settCardFirst" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:8px 10px;outline:none;min-height:var(--tap)">
+        <option value="term">Term</option>
+        <option value="definition">Definition</option>
+      </select>
+    </div>
 
     <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:16px 0 10px">Timers</div>
     <div class="settings-row"><div><div class="s-lbl">Per-Question Timer (seconds)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
@@ -713,7 +757,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- IMPORT/EXPORT MODAL -->
 <div class="modal-overlay" id="importExportModal" style="display:none" onclick="closeImportExportModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">⇅ Import / Export</div>
 
     <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Export</div>
@@ -747,7 +791,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- EXPORT MODAL -->
 <div class="modal-overlay" id="exportModal" style="display:none" onclick="closeExportModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:480px">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Export Sets</div>
     <div style="margin-bottom:14px;display:flex;gap:8px">
       <button class="btn btn-ghost btn-sm" onclick="exportSelectAll()">Select All</button>
@@ -764,7 +808,7 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 <!-- EDIT MODAL -->
 <div class="modal-overlay" id="editModal" style="display:none" onclick="closeEditModal(event)">
   <div class="modal" onclick="event.stopPropagation()">
-    <span class="modal-handle"></span>
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
     <div class="modal-title">Edit Question</div>
     <div class="q-form">
       <div><label>Question Text</label><textarea id="editQText" rows="3"></textarea></div>
@@ -773,12 +817,21 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
         <select id="editQType" onchange="updateEditOptionControls()">
           <option value="single">Single answer</option>
           <option value="multi">Multiple answers</option>
+          <option value="card">Flashcard</option>
         </select>
       </div>
-      <div>
-        <label>Answer Choices</label>
-        <div class="options-builder" id="editOptionsBuilder"></div>
-        <button class="add-option-btn" onclick="addEditOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+      <!-- MC fields -->
+      <div id="editQMcFields">
+        <div>
+          <label>Answer Choices</label>
+          <div class="options-builder" id="editOptionsBuilder"></div>
+          <button class="add-option-btn" onclick="addEditOptionRow()" style="margin-top:10px;width:100%">+ Add Option</button>
+        </div>
+      </div>
+      <!-- Flashcard fields -->
+      <div id="editQCardFields" style="display:none">
+        <div><label>Term</label><textarea id="editQTerm" rows="2"></textarea></div>
+        <div style="margin-top:10px"><label>Definition</label><textarea id="editQDef" rows="3"></textarea></div>
       </div>
       <div><label>Explanation (optional)</label><input type="text" id="editQExplain"></div>
       <div>
@@ -828,12 +881,14 @@ function modalClose(id){
 }
 function _attachSwipe(modal, onDismiss){
   let startY=0, currentY=0, dragging=false;
+  const handleZone=modal.querySelector('.modal-handle-zone');
+  if(!handleZone) return; // No handle = no swipe
+
   function onTouchStart(e){
-    // Only start swipe from handle or top 60px of modal
-    const touch=e.touches[0];
-    const rect=modal.getBoundingClientRect();
-    if(touch.clientY-rect.top>60 && !e.target.classList.contains('modal-handle')) return;
-    startY=touch.clientY; dragging=true; modal.style.transition='none';
+    startY=e.touches[0].clientY;
+    currentY=startY;
+    dragging=true;
+    modal.style.transition='none';
   }
   function onTouchMove(e){
     if(!dragging) return;
@@ -845,17 +900,28 @@ function _attachSwipe(modal, onDismiss){
     if(!dragging) return; dragging=false;
     const delta=currentY-startY;
     modal.style.transition='';
-    if(delta>80){ modal.style.transform=`translateY(100%)`; setTimeout(()=>{ modal.style.transform=''; onDismiss(); },220); }
-    else modal.style.transform='';
+    if(delta>120){
+      modal.style.transform=`translateY(100%)`;
+      setTimeout(()=>{ modal.style.transform=''; onDismiss(); },220);
+    } else {
+      modal.style.transform='';
+    }
     startY=0; currentY=0;
   }
-  modal.removeEventListener('touchstart',modal._swipeStart);
-  modal.removeEventListener('touchmove',modal._swipeMove);
-  modal.removeEventListener('touchend',modal._swipeEnd);
-  modal._swipeStart=onTouchStart; modal._swipeMove=onTouchMove; modal._swipeEnd=onTouchEnd;
-  modal.addEventListener('touchstart',onTouchStart,{passive:true});
-  modal.addEventListener('touchmove',onTouchMove,{passive:true});
-  modal.addEventListener('touchend',onTouchEnd);
+
+  // Remove previous listeners if any
+  if(handleZone._swipeStart) handleZone.removeEventListener('touchstart',handleZone._swipeStart);
+  if(handleZone._swipeMove) modal.removeEventListener('touchmove',handleZone._swipeMove);
+  if(handleZone._swipeEnd) modal.removeEventListener('touchend',handleZone._swipeEnd);
+
+  handleZone._swipeStart=onTouchStart;
+  handleZone._swipeMove=onTouchMove;
+  handleZone._swipeEnd=onTouchEnd;
+
+  // Start only from handle zone, move/end on modal
+  handleZone.addEventListener('touchstart',onTouchStart,{passive:true});
+  modal.addEventListener('touchmove',handleZone._swipeMove,{passive:true});
+  modal.addEventListener('touchend',handleZone._swipeEnd);
 }
 
 // ═══════════════════════════════════════════════════
@@ -909,7 +975,7 @@ function saveFlags(id,fl){ localStorage.setItem('qforge_flags_'+id,JSON.stringif
 // Incorrect tracking: {key: questionText, streak: consecutive correct count needed to clear}
 function loadIncorrect(id){ return JSON.parse(localStorage.getItem('qforge_incorrect_'+id)||'[]'); }
 function saveIncorrect(id,arr){ localStorage.setItem('qforge_incorrect_'+id,JSON.stringify(arr)); }
-function incorrectKey(q){ return q.text.trim(); }
+function incorrectKey(q){ return q.type==='card'?('card:'+q.term.trim()):q.text.trim(); }
 function isIncorrect(q){ return loadIncorrect(activeSetId).some(x=>x.key===incorrectKey(q)); }
 function markIncorrect(q){
   const arr=loadIncorrect(activeSetId), key=incorrectKey(q);
@@ -1200,7 +1266,7 @@ function renameCurrentSet(){
 // ═══════════════════════════════════════════════════
 //  FLAGS
 // ═══════════════════════════════════════════════════
-function flagKey(q){ return q.text.trim(); }
+function flagKey(q){ return q.type==='card'?('card:'+q.term.trim()):q.text.trim(); }
 function isFlagged(q){ return flaggedKeys.includes(flagKey(q)); }
 function toggleGlobalFlag(q){ const k=flagKey(q),i=flaggedKeys.indexOf(k); if(i>=0)flaggedKeys.splice(i,1); else flaggedKeys.push(k); saveFlg(); }
 function clearAllFlags(){ if(!confirm('Clear all flags for this set?')) return; flaggedKeys=[]; saveFlg(); renderQList(); }
@@ -1239,14 +1305,18 @@ function renderQList(){
     const fl=isFlagged(q), inc=isIncorrect(q);
     const incData=loadIncorrect(activeSetId).find(x=>x.key===incorrectKey(q));
     const streakTip=incData?`${incData.streak}/2 correct`:'';
+    const isCard=q.type==='card';
+    const displayText=isCard?q.term:(q.text||'');
+    const badgeLabel=isCard?'Card':q.type==='multi'?'Multi':'Single';
+    const badgeClass=isCard?' card-type':q.type==='multi'?' multi':'';
     return `<div class="q-item${fl?' is-flagged':''}${inc?' is-incorrect':''}">
       ${q.image?`<img class="q-item-img" src="${q.image}" alt="">`:'' }
-      <div class="q-item-text" onclick="openEditModal(${i})">${esc(q.text.slice(0,80))}${q.text.length>80?'…':''}</div>
+      <div class="q-item-text" onclick="openEditModal(${i})">${esc(displayText.slice(0,80))}${displayText.length>80?'…':''}</div>
       <div class="q-item-right">
         <div class="q-item-badges">
           ${inc?`<span class="q-item-badge" style="background:rgba(255,82,82,.12);color:var(--red);border-color:rgba(255,82,82,.25)" title="${streakTip}">❌ ${streakTip}</span>`:''}
           ${fl?'<span class="q-item-badge flag-badge">🚩</span>':''}
-          <span class="q-item-badge${q.type==='multi'?' multi':''}">${q.type==='multi'?'Multi':'Single'}</span>
+          <span class="q-item-badge${badgeClass}">${badgeLabel}</span>
         </div>
         <div class="q-item-actions">
           <button class="icon-btn edit-icon" onclick="openEditModal(${i})" title="Edit">✏️</button>
@@ -1267,8 +1337,15 @@ function clearAllQuestions(){ if(confirm('Delete ALL questions in this set?')){ 
 // ═══════════════════════════════════════════════════
 function initOptionRows(){ document.getElementById('optionsBuilder').innerHTML=''; [1,2,3,4].forEach(()=>addOptionRow()); }
 function updateOptionControls(){
-  const t=document.getElementById('newQType').value==='multi'?'checkbox':'radio';
-  document.querySelectorAll('#optionsBuilder .opt-correct-input').forEach(inp=>{inp.type=t;inp.name='correct';});
+  const type=document.getElementById('newQType').value;
+  const isCard=type==='card';
+  document.getElementById('newQMcFields').style.display=isCard?'none':'';
+  document.getElementById('newQCardFields').style.display=isCard?'':'none';
+  document.getElementById('newQTextWrap').style.display=isCard?'none':'';
+  if(!isCard){
+    const t=type==='multi'?'checkbox':'radio';
+    document.querySelectorAll('#optionsBuilder .opt-correct-input').forEach(inp=>{inp.type=t;inp.name='correct';});
+  }
 }
 function addOptionRow(){
   const b=document.getElementById('optionsBuilder');
@@ -1277,7 +1354,19 @@ function addOptionRow(){
   d.innerHTML=`<input type="${t}" class="opt-correct-input" name="correct"><input type="text" class="opt-text" placeholder="Answer option..."><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
   b.appendChild(d);
 }
-function cancelEdit(){ initOptionRows(); document.getElementById('newQText').value=''; document.getElementById('newQExplain').value=''; document.getElementById('newQType').value='single'; showView('manage'); }
+function cancelEdit(){
+  initOptionRows();
+  document.getElementById('newQText').value='';
+  document.getElementById('newQExplain').value='';
+  document.getElementById('newQTerm').value='';
+  document.getElementById('newQDef').value='';
+  document.getElementById('newQType').value='single';
+  document.getElementById('newQMcFields').style.display='';
+  document.getElementById('newQCardFields').style.display='none';
+  document.getElementById('newQTextWrap').style.display='';
+  _resetNewQImgUI();
+  showView('manage');
+}
 let _newQImg=null, _editQImg=null;
 
 function handleNewQImg(evt){
@@ -1335,14 +1424,24 @@ function _loadImgIntoEdit(img){
   }
 }
 function saveQuestion(){
-  const text=document.getElementById('newQText').value.trim();
-  if(!text) return alert('Please enter a question.');
-  const rows=document.querySelectorAll('#optionsBuilder .option-row');
-  const options=[],correct=[];
-  rows.forEach(row=>{ const t=row.querySelector('.opt-text').value.trim(); const c=row.querySelector('.opt-correct-input').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
-  if(options.length<2) return alert('Add at least 2 options.');
-  if(!correct.length) return alert('Mark at least one correct answer.');
-  const q={text,type:document.getElementById('newQType').value,options,correct,explain:document.getElementById('newQExplain').value.trim()};
+  const type=document.getElementById('newQType').value;
+  let q;
+  if(type==='card'){
+    const term=document.getElementById('newQTerm').value.trim();
+    const def=document.getElementById('newQDef').value.trim();
+    if(!term) return alert('Please enter a term.');
+    if(!def) return alert('Please enter a definition.');
+    q={type:'card',term,definition:def,explain:document.getElementById('newQExplain').value.trim()};
+  } else {
+    const text=document.getElementById('newQText').value.trim();
+    if(!text) return alert('Please enter a question.');
+    const rows=document.querySelectorAll('#optionsBuilder .option-row');
+    const options=[],correct=[];
+    rows.forEach(row=>{ const t=row.querySelector('.opt-text').value.trim(); const c=row.querySelector('.opt-correct-input').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
+    if(options.length<2) return alert('Add at least 2 options.');
+    if(!correct.length) return alert('Mark at least one correct answer.');
+    q={text,type,options,correct,explain:document.getElementById('newQExplain').value.trim()};
+  }
   if(_newQImg) q.image=_newQImg;
   questions.push(q);
   _resetNewQImgUI();
@@ -1354,17 +1453,25 @@ function saveQuestion(){
 // ═══════════════════════════════════════════════════
 function openEditModal(i){
   editingIdx=i; const q=questions[i];
-  document.getElementById('editQText').value=q.text;
+  const isCard=q.type==='card';
   document.getElementById('editQType').value=q.type;
   document.getElementById('editQExplain').value=q.explain||'';
+  document.getElementById('editQMcFields').style.display=isCard?'none':'';
+  document.getElementById('editQCardFields').style.display=isCard?'':'none';
+  document.getElementById('editQText').value=isCard?'':q.text||'';
+  if(isCard){
+    document.getElementById('editQTerm').value=q.term||'';
+    document.getElementById('editQDef').value=q.definition||'';
+  } else {
+    const b=document.getElementById('editOptionsBuilder'); b.innerHTML='';
+    (q.options||[]).forEach((opt,oi)=>{
+      const d=document.createElement('div'); d.className='option-row';
+      const isC=q.correct.includes(oi), t=q.type==='multi'?'checkbox':'radio';
+      d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"${isC?' checked':''}><input type="text" class="edit-opt-text" value="${esc(opt)}"><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+      b.appendChild(d);
+    });
+  }
   _loadImgIntoEdit(q.image||null);
-  const b=document.getElementById('editOptionsBuilder'); b.innerHTML='';
-  q.options.forEach((opt,oi)=>{
-    const d=document.createElement('div'); d.className='option-row';
-    const isC=q.correct.includes(oi), t=q.type==='multi'?'checkbox':'radio';
-    d.innerHTML=`<input type="${t}" class="edit-opt-correct" name="editcorrect"${isC?' checked':''}><input type="text" class="edit-opt-text" value="${esc(opt)}"><span class="opt-correct-label">✓ Correct</span><button type="button" class="icon-btn" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
-    b.appendChild(d);
-  });
   modalOpen('editModal');
 }
 function closeEditModal(e){
@@ -1372,8 +1479,14 @@ function closeEditModal(e){
   modalClose('editModal'); editingIdx=null;
 }
 function updateEditOptionControls(){
-  const t=document.getElementById('editQType').value==='multi'?'checkbox':'radio';
-  document.querySelectorAll('#editOptionsBuilder .edit-opt-correct').forEach(inp=>{inp.type=t;inp.name='editcorrect';});
+  const type=document.getElementById('editQType').value;
+  const isCard=type==='card';
+  document.getElementById('editQMcFields').style.display=isCard?'none':'';
+  document.getElementById('editQCardFields').style.display=isCard?'':'none';
+  if(!isCard){
+    const t=type==='multi'?'checkbox':'radio';
+    document.querySelectorAll('#editOptionsBuilder .edit-opt-correct').forEach(inp=>{inp.type=t;inp.name='editcorrect';});
+  }
 }
 function addEditOptionRow(){
   const b=document.getElementById('editOptionsBuilder');
@@ -1384,14 +1497,24 @@ function addEditOptionRow(){
 }
 function saveEditQuestion(){
   if(editingIdx===null) return;
-  const text=document.getElementById('editQText').value.trim(); if(!text) return alert('Question text required.');
-  const rows=document.querySelectorAll('#editOptionsBuilder .option-row');
-  const options=[],correct=[];
-  rows.forEach(row=>{ const t=row.querySelector('.edit-opt-text').value.trim(); const c=row.querySelector('.edit-opt-correct').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
-  if(options.length<2) return alert('Need at least 2 options.');
-  if(!correct.length) return alert('Mark at least one correct answer.');
+  const type=document.getElementById('editQType').value;
   const oldKey=flagKey(questions[editingIdx]);
-  const updatedQ={text,type:document.getElementById('editQType').value,options,correct,explain:document.getElementById('editQExplain').value.trim()};
+  let updatedQ;
+  if(type==='card'){
+    const term=document.getElementById('editQTerm').value.trim();
+    const def=document.getElementById('editQDef').value.trim();
+    if(!term) return alert('Term is required.');
+    if(!def) return alert('Definition is required.');
+    updatedQ={type:'card',term,definition:def,explain:document.getElementById('editQExplain').value.trim()};
+  } else {
+    const text=document.getElementById('editQText').value.trim(); if(!text) return alert('Question text required.');
+    const rows=document.querySelectorAll('#editOptionsBuilder .option-row');
+    const options=[],correct=[];
+    rows.forEach(row=>{ const t=row.querySelector('.edit-opt-text').value.trim(); const c=row.querySelector('.edit-opt-correct').checked; if(t){options.push(t);if(c)correct.push(options.length-1);} });
+    if(options.length<2) return alert('Need at least 2 options.');
+    if(!correct.length) return alert('Mark at least one correct answer.');
+    updatedQ={text,type,options,correct,explain:document.getElementById('editQExplain').value.trim()};
+  }
   if(_editQImg) updatedQ.image=_editQImg;
   questions[editingIdx]=updatedQ;
   const newKey=flagKey(questions[editingIdx]);
@@ -1408,6 +1531,18 @@ function importQuestions(){
   raw.split(/\n\s*\n/).filter(b=>b.trim()).forEach(block=>{
     try{
       const lines=block.split('\n').map(l=>l.trim()).filter(Boolean);
+      // Check for CARD block first
+      const cardLine=lines.find(l=>/^CARD:/i.test(l));
+      if(cardLine){
+        const term=cardLine.replace(/^CARD:\s*/i,'').trim();
+        const defLine=lines.find(l=>/^DEF:/i.test(l));
+        const definition=defLine?defLine.replace(/^DEF:\s*/i,'').trim():'';
+        if(!term||!definition){ errors++; return; }
+        const expLine=lines.find(l=>/^EXPLAIN:/i.test(l));
+        const explain=expLine?expLine.replace(/^EXPLAIN:\s*/i,'').trim():'';
+        questions.push({type:'card',term,definition,explain});
+        added++; return;
+      }
       const qLine=lines.find(l=>/^Q\d*:/i.test(l)); if(!qLine) return;
       let text=qLine.replace(/^Q\d*:\s*/i,'').replace(/\[SIMULATION\]/gi,'').trim();
       let isMulti=/\[MULTI\]/i.test(text)||/\(select\s+\w+\)/i.test(text);
@@ -1681,7 +1816,9 @@ function exportFullBackup(){
     flaggedOnly:document.getElementById('settFlaggedOnly').checked,
     qTimer:document.getElementById('settQTimer').value,
     autoAdvance:document.getElementById('settAutoAdvance').checked,
-    qLimit:document.getElementById('settQLimit').value
+    qLimit:document.getElementById('settQLimit').value,
+    cardFirst:document.getElementById('settCardFirst').value,
+    cardsOnly:document.getElementById('settCardsOnly').checked
   };
   const payload={
     type:'fullbackup', version:4,
@@ -1733,6 +1870,8 @@ function importFullBackup(evt){
         set('settFeedback',s.feedback); set('settExplain',s.explain);
         set('settFlaggedOnly',s.flaggedOnly); set('settQTimer',s.qTimer||'0');
         set('settAutoAdvance',s.autoAdvance); set('settQLimit',s.qLimit||'0');
+        if(s.cardFirst) set('settCardFirst',s.cardFirst);
+        if(s.cardsOnly!==undefined) set('settCardsOnly',s.cardsOnly);
       }
       showHomeMsg(`✓ Backup restored — ${newSets.length} set(s) loaded.`,true);
       renderSetsGrid();
@@ -1752,13 +1891,14 @@ function dlBlob(content,filename){
 function startQuiz(){
   let pool=[...questions];
   if(document.getElementById('settFlaggedOnly').checked) pool=pool.filter(isFlagged);
+  if(document.getElementById('settCardsOnly').checked) pool=pool.filter(q=>q.type==='card');
   if(!pool.length) return alert('No questions to quiz!');
   if(document.getElementById('settShuffle').checked) pool.sort(()=>Math.random()-.5);
   // Apply question limit — always shuffle first so limit picks a random subset
   const limit=parseInt(document.getElementById('settQLimit').value)||0;
   if(limit>0 && limit<pool.length) pool=pool.slice(0,limit);
   if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
   quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
   answered=false; overallSec=0; clearInterval(overallInterval);
@@ -1806,27 +1946,101 @@ function renderQuestion(){
   document.getElementById('progressFill').style.width=pct+'%';
   document.getElementById('scoreDisplay').textContent=quiz.score;
   document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
-  document.getElementById('questionText').textContent=q.text;
-  const qImg=document.getElementById('questionImg');
-  if(q.image){ qImg.src=q.image; qImg.style.display='block'; }
-  else { qImg.src=''; qImg.style.display='none'; }
   const fl=isFlagged(q), fb=document.getElementById('flagBtn');
   fb.textContent=fl?'🚩 Flagged':'🚩 Flag'; fb.className='btn btn-flag'+(fl?' flagged':'');
   document.getElementById('questionCard').classList.toggle('is-flagged',fl);
-  const hint=document.getElementById('questionHint');
-  if(q.type==='multi'){hint.textContent=`Select ${q.correct.length} correct answer(s)`;hint.style.display='flex';}
-  else hint.style.display='none';
-  document.getElementById('selHint').textContent=q.type==='multi'?`Choose ${q.correct.length}`:'Choose 1';
   const feedEl=document.getElementById('feedbackBox'); feedEl.className='feedback-box'; feedEl.style.display='none';
-  const keys='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  document.getElementById('choicesList').innerHTML=q.options.map((opt,i)=>
-    `<button class="choice-btn" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
-  ).join('');
-  const sb=document.getElementById('submitBtn');
-  sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
-  if(q.type==='multi'){ sb.disabled=true; sb.style.opacity='.45'; sb.style.cursor='not-allowed'; }
-  else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
+
+  if(q.type==='card'){
+    // Flashcard mode
+    const showFirst=document.getElementById('settCardFirst').value||'term';
+    const frontText=showFirst==='term'?q.term:q.definition;
+    const backText=showFirst==='term'?q.definition:q.term;
+    const frontLabel=showFirst==='term'?'Term':'Definition';
+    const backLabel=showFirst==='term'?'Definition':'Term';
+    document.getElementById('questionText').textContent='';
+    const qImg=document.getElementById('questionImg'); qImg.src=''; qImg.style.display='none';
+    document.getElementById('questionHint').style.display='none';
+    document.getElementById('choicesList').innerHTML=`
+      <div class="flip-card-wrap" onclick="flipCard(this)">
+        <div class="flip-card" id="flipCard">
+          <div class="flip-face flip-face-front">
+            <div class="flip-label">${frontLabel}</div>
+            ${q.image?`<img class="flip-card-img" src="${q.image}" alt="">`:''}
+            <div class="flip-text">${esc(frontText)}</div>
+            <div class="flip-tap-hint">Tap to reveal ${backLabel.toLowerCase()}</div>
+          </div>
+          <div class="flip-face flip-face-back">
+            <div class="flip-label">${backLabel}</div>
+            <div class="flip-text">${esc(backText)}</div>
+            ${q.explain?`<div style="font-size:.75rem;color:var(--muted);margin-top:10px;line-height:1.5">${esc(q.explain)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    const sb=document.getElementById('submitBtn');
+    sb.style.display='none';
+    document.getElementById('selHint').textContent='';
+    // Show got-it / missed buttons in footer after flip
+    const footer=document.querySelector('.quiz-footer');
+    footer.innerHTML=`
+      <span class="quiz-footer-hint" id="selHint"></span>
+      <button class="btn btn-primary submit-btn" id="submitBtn" style="display:none"></button>
+      <div class="flashcard-btns" id="flashcardBtns" style="display:none;width:100%">
+        <button class="btn-got-it flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(true)">✓ Got it</button>
+        <button class="btn-missed flashcard-btns" style="flex:1;padding:14px;border-radius:var(--radius);font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem" onclick="cardAnswer(false)">✗ Missed it</button>
+      </div>`;
+  } else {
+    // MC mode — restore footer if it was replaced
+    const footer=document.querySelector('.quiz-footer');
+    if(!document.getElementById('submitBtn') || document.getElementById('submitBtn').parentElement!==footer){
+      footer.innerHTML=`<span class="quiz-footer-hint" id="selHint"></span><button class="btn btn-primary submit-btn" id="submitBtn" onclick="submitAnswer()">Submit Answer</button>`;
+    }
+    document.getElementById('questionText').textContent=q.text;
+    const qImg=document.getElementById('questionImg');
+    if(q.image){ qImg.src=q.image; qImg.style.display='block'; }
+    else { qImg.src=''; qImg.style.display='none'; }
+    const hint=document.getElementById('questionHint');
+    if(q.type==='multi'){hint.textContent=`Select ${q.correct.length} correct answer(s)`;hint.style.display='flex';}
+    else hint.style.display='none';
+    document.getElementById('selHint').textContent=q.type==='multi'?`Choose ${q.correct.length}`:'Choose 1';
+    const keys='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    document.getElementById('choicesList').innerHTML=q.options.map((opt,i)=>
+      `<button class="choice-btn" id="choice-${i}" onclick="toggleChoice(${i})"><span class="ck">${keys[i]}</span><span>${esc(opt)}</span></button>`
+    ).join('');
+    const sb=document.getElementById('submitBtn');
+    sb.style.display=''; sb.textContent='Submit Answer'; sb.onclick=submitAnswer;
+    if(q.type==='multi'){ sb.disabled=true; sb.style.opacity='.45'; sb.style.cursor='not-allowed'; }
+    else { sb.disabled=false; sb.style.opacity=''; sb.style.cursor=''; }
+  }
   startQTimer();
+}
+function flipCard(wrap){
+  const card=wrap.querySelector('.flip-card');
+  card.classList.toggle('flipped');
+  if(card.classList.contains('flipped')){
+    const fbDiv=document.getElementById('flashcardBtns');
+    if(fbDiv) fbDiv.style.display='flex';
+  }
+}
+function cardAnswer(gotIt){
+  if(answered) return; answered=true;
+  const q=quiz.questions[quiz.idx];
+  if(gotIt){ quiz.score++; markCorrect(q); }
+  else { markIncorrect(q); quiz.wrongs=(quiz.wrongs||0)+1; }
+  document.getElementById('scoreDisplay').textContent=quiz.score;
+  document.getElementById('wrongDisplay').textContent=quiz.wrongs||0;
+  renderHeader();
+  clearInterval(qInterval);
+  const isLast=quiz.idx>=quiz.questions.length-1;
+  const fbDiv=document.getElementById('flashcardBtns');
+  if(fbDiv) fbDiv.style.display='none';
+  const footer=document.querySelector('.quiz-footer');
+  const nextBtn=document.createElement('button');
+  nextBtn.className='btn btn-primary submit-btn';
+  nextBtn.style.width='100%';
+  nextBtn.textContent=isLast?'See Results →':'Next →';
+  nextBtn.onclick=nextQuestion;
+  footer.appendChild(nextBtn);
 }
 function toggleFlag(){
   const q=quiz.questions[quiz.idx]; toggleGlobalFlag(q);
@@ -1891,7 +2105,7 @@ function quickQuiz(n){
   if(!questions.length) return alert('No questions in this set.');
   let pool=[...questions].sort(()=>Math.random()-.5).slice(0,n);
   if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
   quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0};
   answered=false; overallSec=0; clearInterval(overallInterval);
@@ -1906,7 +2120,7 @@ function startIncorrectQuiz(){
   if(!pool.length) return alert('Incorrect questions not found in this set.');
   pool.sort(()=>Math.random()-.5);
   if(document.getElementById('settShuffleOpts').checked){
-    pool=pool.map(q=>{ const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
+    pool=pool.map(q=>{ if(q.type==='card') return q; const p=q.options.map((o,i)=>({o,c:q.correct.includes(i)})); p.sort(()=>Math.random()-.5); return{...q,options:p.map(x=>x.o),correct:p.map((x,i)=>x.c?i:-1).filter(i=>i>=0)}; });
   }
   quiz={questions:pool,idx:0,score:0,wrongs:0,selected:[],timeouts:0,isIncorrectMode:true};
   answered=false; overallSec=0; clearInterval(overallInterval);
