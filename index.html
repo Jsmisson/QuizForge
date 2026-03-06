@@ -2277,9 +2277,6 @@ function isFreeNav(){
 }
 function showResults(){
   clearInterval(overallInterval); clearInterval(qInterval);
-  console.log('[QuizForge] showResults — answerLog:', JSON.stringify((quiz.answerLog||[]).map(e=>({key:incorrectKey(e.q),isCorrect:e.isCorrect}))));
-  console.log('[QuizForge] showResults — savedAnswers:', JSON.stringify(quiz.savedAnswers));
-  console.log('[QuizForge] showResults — wrongs:', quiz.wrongs, 'score:', quiz.score);
   const total=quiz.questions.length, pct=Math.round((quiz.score/total)*100), pass=pct>=70;
   document.getElementById('resultScore').textContent=pct+'%';
   document.getElementById('resultScore').className='result-score '+(pass?'pass':'fail');
@@ -2295,15 +2292,15 @@ function showResults(){
   const incBtn=document.getElementById('retakeIncorrectBtn');
   if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
   if(incBtn) incBtn.textContent=`❌ Review (${incCount})`;
-  // Show View Incorrect button if any wrong answers logged
-  const wrongLog=(quiz.answerLog||[]).filter(e=>!e.isCorrect);
-  // Also cross-check savedAnswers in case answerLog missed any
-  const savedWrongCount=Object.values(quiz.savedAnswers||{}).filter(a=>!a.isCorrect).length;
+  // Show View Incorrect button — build directly from savedAnswers (always reliable)
+  const savedWrongs=Object.entries(quiz.savedAnswers||{})
+    .filter(([,a])=>!a.isCorrect)
+    .map(([i,a])=>({q:quiz.questions[+i], selected:a.selected||[], isCorrect:false, isCard:a.cardResult!==undefined}))
+    .filter(e=>e.q);
   const viewBtn=document.getElementById('viewIncorrectBtn');
   if(viewBtn){
-    const count=Math.max(wrongLog.length, savedWrongCount);
-    viewBtn.style.display=count>0?'inline-flex':'none';
-    viewBtn.textContent=`📋 View Incorrect (${wrongLog.length||savedWrongCount})`;
+    viewBtn.style.display=savedWrongs.length?'inline-flex':'none';
+    viewBtn.textContent=`📋 View Incorrect (${savedWrongs.length})`;
   }  // Reset review panel
   const revSec=document.getElementById('incorrectReviewSection');
   if(revSec) revSec.style.display='none';
@@ -2331,13 +2328,10 @@ function toggleIncorrectReview(){
   }
 }
 function renderIncorrectReview(){
-  // Build wrongLog from answerLog; fall back to savedAnswers if answerLog is missing entries
-  let wrongLog=(quiz.answerLog||[]).filter(e=>!e.isCorrect);
-  if(wrongLog.length===0 && quiz.savedAnswers){
-    wrongLog=Object.entries(quiz.savedAnswers)
-      .filter(([,a])=>!a.isCorrect)
-      .map(([idx,a])=>({q:quiz.questions[parseInt(idx)],selected:a.selected||[],isCorrect:false,isCard:!!(a.cardResult!==undefined)}));
-  }
+  const wrongLog=Object.entries(quiz.savedAnswers||{})
+    .filter(([,a])=>!a.isCorrect)
+    .map(([i,a])=>({q:quiz.questions[+i], selected:a.selected||[], isCorrect:false, isCard:a.cardResult!==undefined}))
+    .filter(e=>e.q);
   const list=document.getElementById('incorrectReviewList');
   if(!list) return;
   list.innerHTML=wrongLog.map((entry,ei)=>{
@@ -2410,6 +2404,17 @@ function showPartialResults(){
   const incCount=loadIncorrect(activeSetId).length;
   const incBtn=document.getElementById('retakeIncorrectBtn');
   if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`❌ Review (${incCount})`; }
+  // View Incorrect button
+  const savedWrongs=Object.entries(quiz.savedAnswers||{})
+    .filter(([,a])=>!a.isCorrect)
+    .map(([i,a])=>({q:quiz.questions[+i],selected:a.selected||[],isCorrect:false,isCard:a.cardResult!==undefined}))
+    .filter(e=>e.q);
+  const viewBtn=document.getElementById('viewIncorrectBtn');
+  if(viewBtn){ viewBtn.style.display=savedWrongs.length?'inline-flex':'none'; viewBtn.textContent=`📋 View Incorrect (${savedWrongs.length})`; }
+  const revSec=document.getElementById('incorrectReviewSection');
+  if(revSec) revSec.style.display='none';
+  const revList=document.getElementById('incorrectReviewList');
+  if(revList) revList.innerHTML='';
   const flagged=attempted.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
