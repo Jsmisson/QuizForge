@@ -1175,14 +1175,14 @@ function _collectImageRefs(questions){
 }
 
 // ── Quota-safe localStorage writer ──────────────────────────────────────────
-// Priority order for eviction (lowest priority evicted first):
-//   srs  →  incorrect  →  flags  →  sets/folders/questions (never evicted)
+// Eviction order (most expendable first):
+//   srs → incorrect → flags → other question sets (last resort) → throw
 function _lsSet(key, value){
   const evictPrefixes = ['qforge_srs_', 'qforge_incorrect_', 'qforge_flags_'];
   for(let attempt = 0; attempt <= evictPrefixes.length; attempt++){
     try {
       localStorage.setItem(key, value);
-      return;
+      return; // success
     } catch(e) {
       if(e instanceof DOMException && (
           e.code === 22 || e.code === 1014 ||
@@ -1195,9 +1195,21 @@ function _lsSet(key, value){
             .forEach(k => localStorage.removeItem(k));
           console.warn('[QuizForge] localStorage quota hit — evicted keys with prefix:', prefix);
         } else {
-          console.error('[QuizForge] localStorage quota exceeded and no safe keys to evict. Key:', key);
+          // Last resort: evict question data for OTHER sets (not the one being written)
+          const currentSetKey = key.startsWith('qforge_qs_') ? key : null;
+          let evicted = 0;
+          Object.keys(localStorage)
+            .filter(k => k.startsWith('qforge_qs_') && k !== currentSetKey)
+            .forEach(k => { localStorage.removeItem(k); evicted++; });
+          if(evicted > 0){
+            console.warn('[QuizForge] extreme quota — evicted', evicted, 'other question sets. Re-sync to restore.');
+            try { localStorage.setItem(key, value); return; } catch(_){}
+          }
+          // Truly unrecoverable — throw so sync catch block knows the write failed
+          console.error('[QuizForge] localStorage quota exceeded — could not write:', key);
           if(typeof showToast === 'function')
-            showToast('⚠️ Storage full — some progress data could not be saved. Consider exporting your sets.', 5000);
+            showToast('⚠️ Storage full — data could not be saved. Export a backup and clear some sets.', 6000);
+          throw e;
         }
       } else { throw e; }
     }
@@ -3440,6 +3452,9 @@ const GDRIVE = (() => {
     const mergedSets = localSets.filter(s => !deletedIds.has(s.id));
     console.log('[Sync] mergedSets after filter:', mergedSets.map(s=>s.id+':'+s.name));
 
+    // Hoist lastLocalSync so it's available both inside the forEach and for grid order check below
+    const lastLocalSync = parseInt(localStorage.getItem('qforge_gdrive_lastSync') || '0');
+
     data.sets.forEach(cs => {
       if(deletedIds.has(cs.id)){
         console.log('[Sync] skipping cloud set (tombstoned):', cs.id, cs.name);
@@ -3456,15 +3471,18 @@ const GDRIVE = (() => {
 
       // ── Conflict resolution ──────────────────────────────────────────────
       // lastLocalSync = when this device last successfully pushed to Drive.
-      // setTs.questions = when questions were last modified ON THIS DEVICE.
-      // If questions were modified locally AFTER the last sync, local wins.
-      // Otherwise cloud wins (it's newer or this is a fresh device with no local edits).
-      const lastLocalSync = parseInt(localStorage.getItem('qforge_gdrive_lastSync') || '0');
-      const setTs = mergedClearTs[cs.id] || {};
+      // localSetTs.questions = when questions were last modified ON THIS DEVICE.
+      // We use localClearTs (not mergedClearTs) so cloud timestamps can't block cloud data.
+      // Cloud wins unless THIS device edited the field after its last successful sync.
+      const localSetTs = localClearTs[cs.id] || {};
 
-      const localQsModified  = setTs.questions  || 0;
-      const localFlModified  = setTs.flags      || 0;
-      const localIncModified = setTs.incorrect  || 0;
+      const localQsModified  = localSetTs.questions  || 0;
+      const localFlModified  = localSetTs.flags      || 0;
+      const localIncModified = localSetTs.incorrect  || 0;
+
+      const cloudQCount = Array.isArray(cs.questions) ? cs.questions.length : 'missing';
+      const localQCount = JSON.parse(localStorage.getItem('qforge_qs_' + cs.id) || '[]').length;
+      console.log(`[Sync] "${cs.name}" cloud:${cloudQCount}q local:${localQCount}q localMod:${new Date(localQsModified).toLocaleTimeString()} lastSync:${new Date(lastLocalSync).toLocaleTimeString()} localNewer:${localQsModified > lastLocalSync} isActive:${cs.id===activeSetId}`);
 
       // Questions: cloud wins unless local was modified AFTER last successful sync
       if(localQsModified > lastLocalSync){
@@ -3497,9 +3515,10 @@ const GDRIVE = (() => {
     console.log('[Sync] final mergedSets saved:', mergedSets.map(s=>s.id+':'+s.name));
 
     // Apply cloud grid order if newer than local
+    // Use localClearTs for the same reason as above — cloud ts shouldn't block cloud data
     if(Array.isArray(data.gridOrder) && data.gridOrder.length){
-      const gridTs = (mergedClearTs['__grid__'] || {}).order || 0;
-      if(!gridTs || cloudSyncedAt > gridTs){
+      const localGridTs = (localClearTs['__grid__'] || {}).order || 0;
+      if(localGridTs <= lastLocalSync){
         _lsSet('qforge_grid_order', JSON.stringify(data.gridOrder));
         console.log('[Sync] applied cloud grid order');
       } else {
