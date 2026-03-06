@@ -38,6 +38,7 @@ h1{font-size:clamp(1.1rem,4vw,1.4rem)}
 
 /* ── Header ── */
 header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:10px}
+.logo-wrap{display:flex;flex-direction:column;gap:2px}
 .logo{font-size:clamp(1.2rem,5vw,1.4rem);font-weight:800;letter-spacing:-.5px;cursor:pointer;user-select:none}
 .logo span{color:var(--accent)}
 .header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
@@ -427,14 +428,12 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 #syncSignInBtn svg{flex-shrink:0}
 
 /* ── Persistent header sync strip ── */
-#syncStrip{display:none;align-items:center;gap:6px;padding:3px 12px;
-  background:var(--surface2);border-bottom:1px solid var(--border);
-  font-size:.65rem;color:var(--muted);cursor:pointer;transition:background .15s}
-#syncStrip:hover{background:var(--surface)}
-#syncStrip.visible{display:flex}
-.sstrip-avatar{display:none}
-.sstrip-name{display:none}
-.sstrip-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+#syncStrip{display:none;align-items:center;gap:4px;
+  font-size:.6rem;color:var(--muted);cursor:pointer;
+  letter-spacing:.2px;line-height:1}
+#syncStrip:hover .sstrip-status{color:var(--accent)}
+#syncStrip.visible{display:inline-flex}
+.sstrip-dot{width:5px;height:5px;border-radius:50%;background:var(--muted);flex-shrink:0}
 .sstrip-dot.ok{background:var(--green)}
 .sstrip-dot.err{background:var(--red)}
 .sstrip-dot.busy{background:var(--orange);animation:pulse .9s infinite}
@@ -466,15 +465,15 @@ body.modal-open{overflow:hidden;position:fixed;width:100%}
 
   <!-- HEADER -->
   <header>
-    <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
+    <div class="logo-wrap">
+      <div class="logo" onclick="goHome()">Quiz<span>Forge</span></div>
+      <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
+        <div class="sstrip-dot" id="sstripDot"></div>
+        <span class="sstrip-status" id="sstripStatus">Syncing…</span>
+      </div>
+    </div>
     <div class="header-actions" id="headerRight"></div>
   </header>
-
-  <!-- SYNC STATUS STRIP (visible when signed into Google Drive) -->
-  <div id="syncStrip" onclick="openImportExportModal()" title="Google Drive sync — tap to manage">
-    <div class="sstrip-dot" id="sstripDot"></div>
-    <span class="sstrip-status" id="sstripStatus">Syncing…</span>
-  </div>
 
   <!-- ═══ SETS HOME ═══ -->
   <div id="view-home" class="view active">
@@ -2876,6 +2875,10 @@ const GDRIVE = (() => {
   window.saveQs = function(id, qs){ _origSaveQs(id, qs); scheduleSync(); };
   const _origSaveFlags = window.saveFlags;
   window.saveFlags = function(id, fl){ _origSaveFlags(id, fl); scheduleSync(); };
+  const _origSaveFolders = window.saveFolders;
+  window.saveFolders = function(f){ _origSaveFolders(f); scheduleSync(); };
+  const _origSaveIncorrect = window.saveIncorrect;
+  window.saveIncorrect = function(id, arr){ _origSaveIncorrect(id, arr); scheduleSync(); };
 
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
