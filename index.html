@@ -2805,10 +2805,12 @@ const GDRIVE = (() => {
   // ── Build full backup payload (mirrors exportFullBackup) ──
   function _buildPayload(){
     const sets = loadSets(), folders = loadFolders();
+    const tombstones = loadTombstones();
+    console.log('[Sync] building payload — sets:', sets.length, 'tombstones:', tombstones);
     return {
       type: 'fullbackup', version: 4,
       synced: new Date().toISOString(),
-      tombstones: loadTombstones(),
+      tombstones,
       folders,
       sets: sets.map(s => ({
         id: s.id, name: s.name, folderId: s.folderId || null, created: s.created,
@@ -2827,18 +2829,23 @@ const GDRIVE = (() => {
     // Merge tombstones — union of local + cloud deletions
     const localTombstones  = loadTombstones();
     const cloudTombstones  = Array.isArray(data.tombstones) ? data.tombstones : [];
+    console.log('[Sync] localTombstones:', localTombstones);
+    console.log('[Sync] cloudTombstones:', cloudTombstones);
+
     const mergedTombstones = [...localTombstones];
     cloudTombstones.forEach(ct => {
       if(!mergedTombstones.find(t => t.id === ct.id)) mergedTombstones.push(ct);
     });
     localStorage.setItem('qforge_tombstones', JSON.stringify(mergedTombstones));
     const deletedIds = new Set(mergedTombstones.map(t => t.id));
+    console.log('[Sync] deletedIds:', [...deletedIds]);
 
     // ── KEY FIX: purge any locally existing sets that are tombstoned ──
-    // This handles sets deleted on another device that still exist here
     const localSets = loadSets();
+    console.log('[Sync] localSets before purge:', localSets.map(s=>s.id+':'+s.name));
     localSets.forEach(s => {
       if(deletedIds.has(s.id)){
+        console.log('[Sync] purging local set:', s.id, s.name);
         localStorage.removeItem('qforge_qs_'        + s.id);
         localStorage.removeItem('qforge_flags_'     + s.id);
         localStorage.removeItem('qforge_incorrect_' + s.id);
@@ -2849,7 +2856,7 @@ const GDRIVE = (() => {
     const localFolders = loadFolders();
     const localIds     = new Set(localSets.map(s => s.id));
 
-    // Merge folders — union of both sides
+    // Merge folders
     const mergedFolders = [...localFolders];
     (data.folders || []).forEach(cf => {
       if(!mergedFolders.find(f => f.id === cf.id)) mergedFolders.push(cf);
@@ -2858,21 +2865,21 @@ const GDRIVE = (() => {
 
     // Build merged set list — local sets minus tombstoned, plus new cloud sets
     const mergedSets = localSets.filter(s => !deletedIds.has(s.id));
+    console.log('[Sync] mergedSets after filter:', mergedSets.map(s=>s.id+':'+s.name));
 
     data.sets.forEach(cs => {
-      // Skip tombstoned sets entirely
       if(deletedIds.has(cs.id)){
+        console.log('[Sync] skipping cloud set (tombstoned):', cs.id, cs.name);
         localStorage.removeItem('qforge_qs_'        + cs.id);
         localStorage.removeItem('qforge_flags_'     + cs.id);
         localStorage.removeItem('qforge_incorrect_' + cs.id);
         localStorage.removeItem('qforge_srs_'       + cs.id);
         return;
       }
-      // Add cloud sets not present locally
       if(!localIds.has(cs.id)){
+        console.log('[Sync] adding cloud set locally:', cs.id, cs.name);
         mergedSets.push({ id: cs.id, name: cs.name, folderId: cs.folderId || null, created: cs.created || Date.now() });
       }
-      // Apply cloud content
       localStorage.setItem('qforge_qs_'        + cs.id, JSON.stringify(Array.isArray(cs.questions)         ? cs.questions         : []));
       localStorage.setItem('qforge_flags_'     + cs.id, JSON.stringify(Array.isArray(cs.flaggedKeys)       ? cs.flaggedKeys       : []));
       localStorage.setItem('qforge_incorrect_' + cs.id, JSON.stringify(Array.isArray(cs.incorrectTracking) ? cs.incorrectTracking : []));
@@ -2880,6 +2887,7 @@ const GDRIVE = (() => {
     });
 
     localStorage.setItem('qforge_sets', JSON.stringify(mergedSets));
+    console.log('[Sync] final mergedSets saved:', mergedSets.map(s=>s.id+':'+s.name));
   }
 
   // ── Main sync — pull then push merged result ──
