@@ -55,6 +55,14 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .btn-ghost:active{border-color:var(--accent);color:var(--accent)}
 .btn-danger{background:transparent;color:var(--red);border:1px solid var(--red)}
 .btn-danger:active{background:var(--red);color:#fff}
+.btn-ghost-green{background:transparent;color:var(--green);border:1px solid rgba(0,230,118,.4)}
+.btn-ghost-green:active{background:rgba(0,230,118,.15)}
+.btn-ghost-red{background:transparent;color:var(--red);border:1px solid rgba(255,82,82,.4)}
+.btn-ghost-red:active{background:rgba(255,82,82,.15)}
+.btn-ghost-yellow{background:transparent;color:var(--yellow);border:1px solid rgba(255,215,64,.4)}
+.btn-ghost-yellow:active{background:rgba(255,215,64,.15)}
+.btn-ghost-accent{background:transparent;color:var(--accent);border:1px solid rgba(0,229,255,.4)}
+.btn-ghost-accent:active{background:rgba(0,229,255,.15)}
 .btn-flag{background:transparent;color:var(--yellow);border:1px solid rgba(255,215,64,.4);font-size:.75rem;padding:7px 14px}
 .btn-flag.flagged{background:rgba(255,215,64,.15);border-color:var(--yellow)}
 .btn:disabled{opacity:.4;cursor:not-allowed}
@@ -63,6 +71,10 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
   .btn-primary:hover{background:#33ecff;transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,229,255,.3)}
   .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
   .btn-danger:hover{background:var(--red);color:#fff}
+  .btn-ghost-green:hover{background:rgba(0,230,118,.12)}
+  .btn-ghost-red:hover{background:rgba(255,82,82,.12)}
+  .btn-ghost-yellow:hover{background:rgba(255,215,64,.12)}
+  .btn-ghost-accent:hover{background:rgba(0,229,255,.12)}
   .btn-flag:hover{background:rgba(255,215,64,.1)}
 }
 
@@ -95,12 +107,18 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .set-card:active{border-color:var(--accent);transform:scale(.98)}
 @media(hover:hover){.set-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,229,255,.1)}}
 .set-card.active-set{border-color:var(--accent);background:rgba(0,229,255,.04)}
-.set-card-name{font-size:.95rem;font-weight:700;margin-bottom:5px;padding-right:60px;word-break:break-word;line-height:1.3}
+.set-card-name{font-size:.95rem;font-weight:700;margin-bottom:5px;word-break:break-word;line-height:1.3}
 .set-card-meta{font-size:.7rem;color:var(--muted)}
 .set-card-actions{position:absolute;top:10px;right:10px;display:flex;gap:2px;opacity:1}
 .set-card-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:10px;
   text-transform:uppercase;letter-spacing:.5px;background:rgba(0,229,255,.12);color:var(--accent);
   border:1px solid rgba(0,229,255,.2);margin-top:5px}
+.folder-card{background:rgba(255,145,0,.08);border:1px solid rgba(255,145,0,.5);border-radius:var(--radius);padding:16px;cursor:pointer;position:relative;display:flex;flex-direction:column;gap:4px;transition:border-color .18s,background .18s,transform .18s,box-shadow .18s}
+.folder-card:hover{border-color:var(--orange);background:rgba(255,145,0,.16);transform:translateY(-2px);box-shadow:0 6px 24px rgba(255,145,0,.2)}
+.folder-card:active{border-color:var(--orange);background:rgba(255,145,0,.2);transform:scale(.98)}
+.folder-card-name{font-size:.95rem;font-weight:700;word-break:break-word;line-height:1.3}
+.folder-card-meta{font-size:.7rem;color:var(--muted)}
+.folder-card-icon{font-size:1.3rem;margin-bottom:2px}
 .new-set-card{background:transparent;border:2px dashed var(--border);border-radius:var(--radius);
   padding:18px;cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;
   flex-direction:column;gap:8px;min-height:100px;color:var(--muted);font-size:.82rem;font-weight:600}
@@ -164,6 +182,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .chip{font-size:.7rem;font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid var(--border);
   background:transparent;color:var(--muted);cursor:pointer;font-family:'Sora',sans-serif;transition:all .15s;
   min-height:34px;display:flex;align-items:center}
+.chip:hover:not(.active){border-color:var(--text);color:var(--text);background:rgba(255,255,255,.05)}
 .chip.active{border-color:var(--yellow);color:var(--yellow);background:rgba(255,215,64,.08)}
 
 /* ══ EDIT MODAL ══ */
@@ -366,11 +385,9 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         <p>Each set has its own questions and flags.</p>
       </div>
       <div class="sets-header-actions">
-        <button class="btn btn-ghost btn-sm" onclick="openQuizOptsModal()">⚙️ Quiz Options</button>
-        <button class="btn btn-ghost btn-sm" onclick="openExportModal()">⬇ Export</button>
-        <label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆ Import
-          <input type="file" accept=".qforge,.json" style="display:none" onchange="importBank(event)">
-        </label>
+        <button class="btn btn-primary btn-sm" onclick="openQuizOptsModal()">⚙️ Quiz Options</button>
+        <button class="btn btn-ghost btn-sm" onclick="openOrganizeModal()">⠿ Organize</button>
+        <button class="btn btn-ghost btn-sm" onclick="openImportExportModal()">⇅ Import / Export</button>
       </div>
     </div>
     <div id="homeMsg" class="notice" style="display:none;margin-bottom:12px"></div>
@@ -389,7 +406,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
       <button class="tab active" onclick="showView('manage')">📋 Questions</button>
       <button class="tab" onclick="showView('add')">➕ Add</button>
       <button class="tab" onclick="showView('import')">📥 Import</button>
-      <button class="tab" onclick="showView('settings')">⚙️</button>
+      <button class="tab" onclick="showView('settings')">⚙️ Settings</button>
     </div>
 
     <!-- MANAGE -->
@@ -470,14 +487,20 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
             <button class="btn btn-ghost btn-sm" onclick="renameCurrentSet()">Save</button>
           </div>
         </div>
+        <div class="settings-row">
+          <div><div class="s-lbl">Folder</div><div class="s-desc">Organise this set into a folder</div></div>
+          <select id="setFolderSelect" onchange="assignSetFolder()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:6px 10px;outline:none;min-height:36px">
+            <option value="">— No folder —</option>
+          </select>
+        </div>
         <div class="settings-row"><div><div class="s-lbl">Export This Set</div></div><button class="btn btn-ghost btn-sm" onclick="exportCurrentSet()">⬇ Export</button></div>
       </div>
       <div class="card">
         <div class="card-title">Danger Zone</div>
         <div class="danger-row">
           <button class="btn btn-danger btn-sm" onclick="clearAllQuestions()">🗑 Clear Questions</button>
-          <button class="btn btn-sm" style="color:var(--yellow);border:1px solid rgba(255,215,64,.4);background:transparent" onclick="clearAllFlags()">🚩 Clear Flags</button>
-          <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(255,82,82,.4);background:transparent" onclick="clearIncorrect()">❌ Clear Incorrect</button>
+          <button class="btn btn-ghost-yellow btn-sm" onclick="clearAllFlags()">🚩 Clear Flags</button>
+          <button class="btn btn-ghost-red btn-sm" onclick="clearIncorrect()">❌ Clear Incorrect</button>
           <button class="btn btn-danger btn-sm" onclick="deleteCurrentSet()">✕ Delete Set</button>
         </div>
       </div>
@@ -541,7 +564,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
         </div>
         <div class="result-actions">
           <button class="btn btn-primary" onclick="startQuiz()">🔄 Retake</button>
-          <button class="btn btn-ghost" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none;color:var(--red);border-color:rgba(255,82,82,.4)">📖 Review</button>
+          <button class="btn btn-ghost-red" id="retakeIncorrectBtn" onclick="startIncorrectQuiz()" style="display:none">❌ Review</button>
           <button class="btn btn-ghost" onclick="showView('manage')">📋 Questions</button>
           <button class="btn btn-ghost" onclick="goHome()">⊞ Sets</button>
         </div>
@@ -555,6 +578,61 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
   </div><!-- /innerApp -->
 </div><!-- /app -->
 
+<!-- ORGANIZE MODAL -->
+<div class="modal-overlay" id="organizeModal" style="display:none" onclick="closeOrganizeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">⠿ Organize</div>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Drag to reorder folders and sets, or use the arrows.</p>
+    <div id="organizeList" style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeOrganizeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveOrganize()">Save Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE SET MODAL -->
+<div class="modal-overlay" id="createSetModal" style="display:none" onclick="closeCreateSetModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">➕ New Set</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:4px">
+      <div>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Set Name</label>
+        <input type="text" id="newSetName" placeholder="e.g. Network+, CompTIA Security+" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+      </div>
+      <div>
+        <label style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Folder (optional)</label>
+        <select id="newSetFolder" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+          <option value="">— No folder —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:.72rem" onclick="openFolderManagerModal()">📁 Manage Folders</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCreateSetModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmCreateSet()">Create Set</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOLDER MANAGER MODAL -->
+<div class="modal-overlay" id="folderManagerModal" style="display:none" onclick="closeFolderManagerModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">📁 Manage Folders</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="newFolderName" placeholder="New folder name..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.88rem;padding:8px 12px;outline:none;min-height:var(--tap)">
+      <button class="btn btn-primary btn-sm" onclick="addFolder()">Add</button>
+    </div>
+    <div id="folderList" style="display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeFolderManagerModal()">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- EXIT QUIZ MODAL -->
 <div class="modal-overlay" id="exitQuizModal" style="display:none" onclick="closeExitQuizModal(event)">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:400px">
@@ -562,7 +640,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
     <div class="modal-title">Exit Quiz?</div>
     <div id="exitQuizSummary" style="margin-bottom:18px"></div>
     <div class="modal-footer" style="flex-direction:column;gap:10px">
-      <button class="btn btn-ghost" style="width:100%;color:var(--green);border-color:rgba(0,230,118,.4)" onclick="closeExitQuizModal();showPartialResults()">📊 Save &amp; See Results</button>
+      <button class="btn btn-ghost-green" style="width:100%" onclick="closeExitQuizModal();showPartialResults()">📊 Save &amp; See Results</button>
       <button class="btn btn-danger" style="width:100%" onclick="closeExitQuizModal();endQuiz()">✕ Exit Without Saving</button>
       <button class="btn btn-ghost" style="width:100%" onclick="closeExitQuizModal()">↩ Keep Going</button>
     </div>
@@ -605,6 +683,40 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="closeQuizOptsModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT/EXPORT MODAL -->
+<div class="modal-overlay" id="importExportModal" style="display:none" onclick="closeImportExportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:460px">
+    <span class="modal-handle"></span>
+    <div class="modal-title">⇅ Import / Export</div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Export</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeImportExportModal();openExportModal()">
+        <div style="font-weight:700;margin-bottom:2px">📋 Export Set(s)</div>
+        <div style="font-size:.75rem;color:var(--muted)">Questions only — share with others or back up specific sets</div>
+      </button>
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" onclick="closeImportExportModal();exportFullBackup()">
+        <div style="font-weight:700;margin-bottom:2px">💾 Full Backup</div>
+        <div style="font-size:.75rem;color:var(--muted)">Everything — sets, folders, flags, incorrect tracking, order &amp; settings</div>
+      </button>
+    </div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Import</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">
+      <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:2px">📋 Import Set(s)</div>
+        <div style="font-size:.75rem;color:var(--muted)">Add sets from a .json export file</div>
+        <input type="file" accept=".json" style="display:none" onchange="closeImportExportModal();importBank(event)">
+      </label>
+      <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:2px">💾 Restore Full Backup</div>
+        <div style="font-size:.75rem;color:var(--muted);color:var(--red)">⚠ Replaces ALL current data</div>
+        <input type="file" accept=".json" style="display:none" onchange="closeImportExportModal();importFullBackup(event)">
+      </label>
     </div>
   </div>
 </div>
@@ -696,6 +808,8 @@ updateOnlineStatus();
 // ═══════════════════════════════════════════════════
 function loadSets(){ return JSON.parse(localStorage.getItem('qforge_sets')||'[]'); }
 function saveSets(s){ localStorage.setItem('qforge_sets',JSON.stringify(s)); }
+function loadFolders(){ return JSON.parse(localStorage.getItem('qforge_folders')||'[]'); }
+function saveFolders(f){ localStorage.setItem('qforge_folders',JSON.stringify(f)); }
 function loadQs(id){ return JSON.parse(localStorage.getItem('qforge_qs_'+id)||'[]'); }
 function saveQs(id,qs){ localStorage.setItem('qforge_qs_'+id,JSON.stringify(qs)); }
 function loadFlags(id){ return JSON.parse(localStorage.getItem('qforge_flags_'+id)||'[]'); }
@@ -782,32 +896,11 @@ function renderHeader(){
   const hr=document.getElementById('headerRight');
   if(activeSetId){
     const inc=loadIncorrect(activeSetId);
-    const incBtn=inc.length?`<button class="btn btn-ghost btn-sm" onclick="startIncorrectQuiz()" style="color:var(--red);border-color:rgba(255,82,82,.4)">📖 Review (${inc.length})</button>`:'';
-    hr.innerHTML=`${incBtn}<button class="btn btn-ghost btn-sm" onclick="quickQuiz(10)" style="color:var(--accent);border-color:rgba(0,229,255,.4)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
+    const incBtn=inc.length?`<button class="btn btn-ghost-red btn-sm" onclick="startIncorrectQuiz()">❌ Review (${inc.length})</button>`:'';
+    hr.innerHTML=`${incBtn}<button class="btn btn-ghost-accent btn-sm" onclick="quickQuiz(10)">⚡ Quick 10</button><button class="btn btn-primary btn-sm" onclick="openPreQuizModal()">▶ Quiz</button>`;
   } else { hr.innerHTML=''; }
 }
 
-function renderSetsGrid(){
-  // Always remove legacy fallback button if present
-  const fb=document.getElementById('createSetFallback');
-  if(fb) fb.remove();
-  const sets=loadSets();
-  const grid=document.getElementById('setsGrid');
-  if(!grid) return;
-  let html='';
-  if(sets && sets.length){
-    html=sets.map(s=>{
-      const qs=loadQs(s.id)||[], fl=loadFlags(s.id)||[], isActive=s.id===activeSetId;
-      return `<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
-        <div class="set-card-name" id="sname-${s.id}">${esc(s.name)}</div>
-        <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''} · ${fl.length} flagged</div>
-        ${isActive?'<span class="set-card-badge">Active</span>':''}
-      </div>`;
-    }).join('');
-  }
-  html+=`<div class="new-set-card" onclick="createSet()"><div class="plus">＋</div><div>New Set</div></div>`;
-  grid.innerHTML=html;
-}
 
 function openSet(id){
   const sets=loadSets(), set=sets.find(s=>s.id===id); if(!set) return;
@@ -817,6 +910,8 @@ function openSet(id){
   document.getElementById('bcSetName').textContent=set.name;
   document.getElementById('importSetName').textContent=set.name;
   document.getElementById('renameInput').value=set.name;
+  populateFolderSelects();
+  document.getElementById('setFolderSelect').value=set.folderId||'';
   renderHeader();
   INNER_VIEWS.forEach(v=>{ const el=document.getElementById('view-'+v); if(el) el.classList.remove('active'); });
   document.getElementById('view-manage').classList.add('active');
@@ -825,12 +920,159 @@ function openSet(id){
   window.scrollTo({top:0,behavior:'instant'});
 }
 
-function createSet(){
-  const name=prompt('Set name:','New Set');
-  if(!name||!name.trim()) return;
+function loadGridOrder(){ return JSON.parse(localStorage.getItem('qforge_grid_order')||'[]'); }
+function saveGridOrder(order){ localStorage.setItem('qforge_grid_order',JSON.stringify(order)); }
+
+function renderSetsGrid(){
+  const fb=document.getElementById('createSetFallback'); if(fb) fb.remove();
+  const sets=loadSets(), folders=loadFolders();
+  const grid=document.getElementById('setsGrid');
+  if(!grid) return;
+
+  // Build ordered list respecting saved grid order
+  const savedOrder=loadGridOrder();
+  const allItems=[
+    ...folders.map(f=>({type:'folder',id:f.id})),
+    ...sets.filter(s=>!s.folderId).map(s=>({type:'set',id:s.id}))
+  ];
+
+  // Sort allItems by savedOrder, appending anything not yet in savedOrder at end
+  let ordered=[];
+  if(savedOrder.length){
+    savedOrder.forEach(o=>{ const found=allItems.find(x=>x.type===o.type&&x.id===o.id); if(found) ordered.push(found); });
+    allItems.forEach(x=>{ if(!ordered.find(o=>o.type===x.type&&o.id===x.id)) ordered.push(x); });
+  } else {
+    ordered=allItems;
+  }
+
+  let html='';
+  ordered.forEach(item=>{
+    if(item.type==='folder'){
+      const f=folders.find(x=>x.id===item.id); if(!f) return;
+      const folderSets=sets.filter(s=>s.folderId===f.id);
+      html+=`<div class="folder-card" onclick="openFolder('${f.id}')">
+        <div class="folder-card-icon">📁</div>
+        <div class="folder-card-name">${esc(f.name)}</div>
+        <div class="folder-card-meta">${folderSets.length} set${folderSets.length!==1?'s':''}</div>
+      </div>`;
+    } else {
+      const s=sets.find(x=>x.id===item.id); if(!s) return;
+      const qs=loadQs(s.id)||[], isActive=s.id===activeSetId;
+      html+=`<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
+        <div class="set-card-name">${esc(s.name)}</div>
+        <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
+        ${isActive?'<span class="set-card-badge">Active</span>':''}
+      </div>`;
+    }
+  });
+
+  html+=`<div class="new-set-card" onclick="openCreateSetModal()"><div class="plus">＋</div><div>New Set</div></div>`;
+  grid.innerHTML=html;
+}
+
+function openFolder(folderId){
+  const folders=loadFolders(), folder=folders.find(f=>f.id===folderId); if(!folder) return;
+  const sets=loadSets().filter(s=>s.folderId===folderId);
+  const grid=document.getElementById('setsGrid');
+
+  let html=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;grid-column:1/-1">
+    <button class="btn btn-ghost btn-sm" onclick="renderSetsGrid()">← Back</button>
+    <span style="font-size:1rem;font-weight:700">📁 ${esc(folder.name)}</span>
+    <button class="btn btn-ghost-red btn-sm" onclick="deleteFolder('${folderId}')" style="margin-left:auto">🗑 Delete Folder</button>
+  </div>`;
+
+  sets.forEach(s=>{
+    const qs=loadQs(s.id)||[], isActive=s.id===activeSetId;
+    html+=`<div class="set-card${isActive?' active-set':''}" onclick="openSet('${s.id}')">
+      <div class="set-card-name">${esc(s.name)}</div>
+      <div class="set-card-meta">${qs.length} question${qs.length!==1?'s':''}</div>
+      ${isActive?'<span class="set-card-badge">Active</span>':''}
+    </div>`;
+  });
+
+  if(!sets.length) html+=`<div style="grid-column:1/-1;color:var(--muted);font-size:.82rem;padding:12px 0">No sets in this folder yet. Assign sets from within each set's Settings tab.</div>`;
+  grid.innerHTML=html;
+}
+
+// ── Folder management ──
+function openCreateSetModal(){
+  document.getElementById('newSetName').value='';
+  populateFolderSelects();
+  document.getElementById('newSetFolder').value='';
+  document.getElementById('createSetModal').style.display='flex';
+  setTimeout(()=>document.getElementById('newSetName').focus(),100);
+}
+function closeCreateSetModal(e){
+  if(e&&e.target!==document.getElementById('createSetModal')) return;
+  document.getElementById('createSetModal').style.display='none';
+}
+function confirmCreateSet(){
+  const name=document.getElementById('newSetName').value.trim();
+  if(!name) return document.getElementById('newSetName').focus();
+  const folderId=document.getElementById('newSetFolder').value||null;
   const sets=loadSets(), id=uid();
-  sets.push({id,name:name.trim(),created:Date.now()});
-  saveSets(sets); renderSetsGrid(); openSet(id);
+  sets.push({id,name,folderId,created:Date.now()});
+  saveSets(sets);
+  document.getElementById('createSetModal').style.display='none';
+  renderSetsGrid();
+  openSet(id);
+}
+function openFolderManagerModal(){
+  renderFolderList();
+  populateFolderSelects();
+  document.getElementById('folderManagerModal').style.display='flex';
+}
+function closeFolderManagerModal(e){
+  if(e&&e.target!==document.getElementById('folderManagerModal')) return;
+  document.getElementById('folderManagerModal').style.display='none';
+  populateFolderSelects();
+}
+function renderFolderList(){
+  const folders=loadFolders();
+  const sets=loadSets();
+  const el=document.getElementById('folderList');
+  if(!folders.length){ el.innerHTML=`<div style="color:var(--muted);font-size:.82rem">No folders yet.</div>`; return; }
+  el.innerHTML=folders.map(f=>{
+    const count=sets.filter(s=>s.folderId===f.id).length;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px">
+      <span>📁 ${esc(f.name)} <span style="color:var(--muted);font-size:.75rem">(${count} set${count!==1?'s':''})</span></span>
+      <button class="btn btn-ghost-red btn-sm" onclick="deleteFolder('${f.id}',true)">🗑</button>
+    </div>`;
+  }).join('');
+}
+function addFolder(){
+  const name=document.getElementById('newFolderName').value.trim();
+  if(!name) return;
+  const folders=loadFolders();
+  if(folders.find(f=>f.name.toLowerCase()===name.toLowerCase())) return alert('A folder with that name already exists.');
+  folders.push({id:uid(),name});
+  saveFolders(folders);
+  document.getElementById('newFolderName').value='';
+  renderFolderList(); populateFolderSelects();
+}
+function deleteFolder(folderId, fromManager=false){
+  const folders=loadFolders(), folder=folders.find(f=>f.id===folderId); if(!folder) return;
+  if(!confirm(`Delete folder "${folder.name}"? Sets inside will be moved to the main screen.`)) return;
+  // Unassign sets from this folder
+  const sets=loadSets().map(s=>s.folderId===folderId?{...s,folderId:null}:s);
+  saveSets(sets);
+  saveFolders(folders.filter(f=>f.id!==folderId));
+  if(fromManager){ renderFolderList(); populateFolderSelects(); }
+  else renderSetsGrid();
+}
+function populateFolderSelects(){
+  const folders=loadFolders();
+  const opts=`<option value="">— No folder —</option>`+folders.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
+  ['newSetFolder','setFolderSelect'].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=opts; });
+}
+function assignSetFolder(){
+  if(!activeSetId) return;
+  const folderId=document.getElementById('setFolderSelect').value||null;
+  const sets=loadSets().map(s=>s.id===activeSetId?{...s,folderId}:s);
+  saveSets(sets);
+}
+function createSet(){
+  openCreateSetModal();
 }
 
 function deleteSet(id){
@@ -1049,7 +1291,15 @@ function importQuestions(){
 function exportCurrentSet(){
   if(!activeSetId||!questions.length) return alert('No questions to export.');
   const sets=loadSets(), s=sets.find(x=>x.id===activeSetId);
-  const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions,flaggedKeys};
+  const folders=loadFolders(), folder=folders.find(f=>f.id===s.folderId)||null;
+  const payload={
+    version:3, exported:new Date().toISOString(),
+    setName:s.name,
+    folderName:folder?folder.name:null,
+    questions,
+    flaggedKeys,
+    incorrectTracking:loadIncorrect(activeSetId)
+  };
   dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
 }
 function openPreQuizModal(){
@@ -1087,6 +1337,79 @@ function openPreQuizModal(){
 function closePreQuizModal(e){
   if(e&&e.target!==document.getElementById('preQuizModal')) return;
   document.getElementById('preQuizModal').style.display='none';
+}
+function openImportExportModal(){
+  document.getElementById('importExportModal').style.display='flex';
+}
+function closeImportExportModal(e){
+  if(e&&e.target!==document.getElementById('importExportModal')) return;
+  document.getElementById('importExportModal').style.display='none';
+}
+function openOrganizeModal(){
+  renderOrganizeList();
+  document.getElementById('organizeModal').style.display='flex';
+}
+function closeOrganizeModal(e){
+  if(e&&e.target!==document.getElementById('organizeModal')) return;
+  document.getElementById('organizeModal').style.display='none';
+}
+let _orgItems=[];
+let _orgDragIdx=null;
+
+function renderOrganizeList(){
+  const sets=loadSets(), folders=loadFolders();
+  // Build flat ordered list matching how grid renders: folders first, then root sets
+  _orgItems=[
+    ...folders.map(f=>({type:'folder',id:f.id,name:f.name,meta:sets.filter(s=>s.folderId===f.id).length+' set(s)'})),
+    ...sets.filter(s=>!s.folderId).map(s=>({type:'set',id:s.id,name:s.name,meta:loadQs(s.id).length+' questions'}))
+  ];
+  _renderOrgDOM();
+}
+
+function _renderOrgDOM(){
+  const el=document.getElementById('organizeList');
+  const len=_orgItems.length;
+  el.innerHTML=_orgItems.map((item,i)=>`
+    <div class="organize-row" data-idx="${i}" draggable="true"
+      ondragstart="orgDragStart(event,${i})" ondragover="orgDragOver(event)" ondrop="orgDrop(event,${i})" ondragend="orgDragEnd()"
+      style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;transition:background .15s">
+      <span style="cursor:grab;color:var(--muted);font-size:1rem;padding:0 4px;user-select:none">⠿</span>
+      <span style="font-size:.9rem">${item.type==='folder'?'📁':'📋'}</span>
+      <span style="flex:1;font-size:.85rem;font-weight:600">${esc(item.name)}</span>
+      <span style="font-size:.72rem;color:var(--muted);margin-right:6px">${item.meta}</span>
+      <div style="display:flex;gap:2px">
+        <button class="icon-btn" style="min-width:32px;min-height:32px;font-size:.8rem" onclick="orgMoveUp(${i})" ${i===0?'disabled':''}>▲</button>
+        <button class="icon-btn" style="min-width:32px;min-height:32px;font-size:.8rem" onclick="orgMoveDown(${i})" ${i===len-1?'disabled':''}>▼</button>
+      </div>
+    </div>`).join('');
+}
+
+function orgMoveUp(i){
+  if(i<=0) return;
+  const tmp=_orgItems[i]; _orgItems[i]=_orgItems[i-1]; _orgItems[i-1]=tmp;
+  _renderOrgDOM();
+}
+function orgMoveDown(i){
+  if(i>=_orgItems.length-1) return;
+  const tmp=_orgItems[i]; _orgItems[i]=_orgItems[i+1]; _orgItems[i+1]=tmp;
+  _renderOrgDOM();
+}
+function orgDragStart(e,i){ _orgDragIdx=i; setTimeout(()=>{ const rows=document.querySelectorAll('.organize-row'); if(rows[i]) rows[i].style.opacity='.4'; },0); }
+function orgDragEnd(){ document.querySelectorAll('.organize-row').forEach(r=>{ r.style.opacity='1'; r.style.background=''; }); }
+function orgDragOver(e){ e.preventDefault(); e.currentTarget.style.background='rgba(0,229,255,.08)'; }
+function orgDrop(e,targetIdx){
+  e.preventDefault();
+  if(_orgDragIdx===null||_orgDragIdx===targetIdx){ _orgDragIdx=null; return; }
+  const item=_orgItems.splice(_orgDragIdx,1)[0];
+  _orgItems.splice(targetIdx,0,item);
+  _orgDragIdx=null;
+  _renderOrgDOM();
+}
+function saveOrganize(){
+  // Persist order to dedicated gridOrder key
+  saveGridOrder(_orgItems.map(x=>({type:x.type,id:x.id})));
+  document.getElementById('organizeModal').style.display='none';
+  renderSetsGrid();
 }
 function openQuizOptsModal(){
   document.getElementById('quizOptsModal').style.display='flex';
@@ -1127,15 +1450,17 @@ function exportSelectNone(){
 function exportSelected(){
   const checked=[...document.querySelectorAll('.export-set-check:checked')].map(c=>c.dataset.id);
   if(!checked.length) return alert('Select at least one set.');
-  const sets=loadSets().filter(s=>checked.includes(s.id));
+  const allSets=loadSets(), sets=allSets.filter(s=>checked.includes(s.id));
+  const folders=loadFolders();
+  // Include only folders that have at least one exported set
+  const usedFolderIds=new Set(sets.map(s=>s.folderId).filter(Boolean));
+  const exportFolders=folders.filter(f=>usedFolderIds.has(f.id));
   if(checked.length===1){
-    // Single set — export as single set file
-    const s=sets[0];
-    const payload={version:2,exported:new Date().toISOString(),setName:s.name,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)};
+    const s=sets[0], folder=folders.find(f=>f.id===s.folderId)||null;
+    const payload={version:3,exported:new Date().toISOString(),setName:s.name,folderName:folder?folder.name:null,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id),incorrectTracking:loadIncorrect(s.id)};
     dlBlob(JSON.stringify(payload,null,2),`quizforge-${s.name.replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`);
   } else {
-    // Multiple sets — export as multi-set file
-    const payload={version:2,exported:new Date().toISOString(),sets:sets.map(s=>({id:s.id,name:s.name,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)}))};
+    const payload={version:3,exported:new Date().toISOString(),folders:exportFolders,sets:sets.map(s=>({id:s.id,name:s.name,folderId:s.folderId||null,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id),incorrectTracking:loadIncorrect(s.id)}))};
     dlBlob(JSON.stringify(payload,null,2),`quizforge-${sets.length}sets-${new Date().toISOString().slice(0,10)}.json`);
   }
   document.getElementById('exportModal').style.display='none';
@@ -1143,7 +1468,8 @@ function exportSelected(){
 }
 function exportAll(){
   const sets=loadSets(); if(!sets.length) return showHomeMsg('No sets to export.',false);
-  const payload={version:2,exported:new Date().toISOString(),sets:sets.map(s=>({id:s.id,name:s.name,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id)}))};
+  const folders=loadFolders();
+  const payload={version:3,exported:new Date().toISOString(),folders,sets:sets.map(s=>({id:s.id,name:s.name,folderId:s.folderId||null,created:s.created,questions:loadQs(s.id),flaggedKeys:loadFlags(s.id),incorrectTracking:loadIncorrect(s.id)}))};
   dlBlob(JSON.stringify(payload,null,2),`quizforge-all-${new Date().toISOString().slice(0,10)}.json`);
   showHomeMsg(`✓ Exported ${sets.length} set(s).`,true);
 }
@@ -1154,16 +1480,109 @@ function importBank(evt){
     try{
       const data=JSON.parse(e.target.result); let setsAdded=0,qAdded=0;
       if(data.sets&&Array.isArray(data.sets)){
-        const existing=loadSets();
-        data.sets.forEach(sd=>{ const newId=uid(); existing.push({id:newId,name:sd.name||'Imported Set',created:sd.created||Date.now()}); saveQs(newId,Array.isArray(sd.questions)?sd.questions:[]); saveFlags(newId,Array.isArray(sd.flaggedKeys)?sd.flaggedKeys:[]); setsAdded++; qAdded+=(sd.questions||[]).length; });
-        saveSets(existing); showHomeMsg(`✓ Imported ${setsAdded} set(s) with ${qAdded} question(s).`,true);
+        const existing=loadSets(), existingFolders=loadFolders();
+        const folderIdMap={};
+        if(data.folders&&Array.isArray(data.folders)){
+          data.folders.forEach(f=>{
+            const ef=existingFolders.find(x=>x.name.toLowerCase()===f.name.toLowerCase());
+            if(ef){ folderIdMap[f.id]=ef.id; }
+            else{ const newId=uid(); folderIdMap[f.id]=newId; existingFolders.push({id:newId,name:f.name}); }
+          });
+          saveFolders(existingFolders);
+        }
+        data.sets.forEach(sd=>{
+          const newId=uid();
+          const newFolderId=sd.folderId&&folderIdMap[sd.folderId]?folderIdMap[sd.folderId]:null;
+          existing.push({id:newId,name:sd.name||'Imported Set',folderId:newFolderId,created:sd.created||Date.now()});
+          saveQs(newId,Array.isArray(sd.questions)?sd.questions:[]);
+          saveFlags(newId,Array.isArray(sd.flaggedKeys)?sd.flaggedKeys:[]);
+          if(Array.isArray(sd.incorrectTracking)) saveIncorrect(newId,sd.incorrectTracking);
+          setsAdded++; qAdded+=(sd.questions||[]).length;
+        });
+        saveSets(existing);
+        showHomeMsg(`✓ Imported ${setsAdded} set(s) with ${qAdded} question(s).`,true);
       } else if(data.questions&&Array.isArray(data.questions)){
-        const existing=loadSets(), newId=uid(), name=(data.setName||file.name.replace(/\.(qforge|json)$/,'')||'Imported Set').trim();
-        existing.push({id:newId,name,created:Date.now()}); saveQs(newId,data.questions); saveFlags(newId,Array.isArray(data.flaggedKeys)?data.flaggedKeys:[]); saveSets(existing);
+        const existing=loadSets(), newId=uid(), name=(data.setName||file.name.replace(/.json$/,'')||'Imported Set').trim();
+        existing.push({id:newId,name,folderId:null,created:Date.now()});
+        saveQs(newId,data.questions);
+        saveFlags(newId,Array.isArray(data.flaggedKeys)?data.flaggedKeys:[]);
+        if(Array.isArray(data.incorrectTracking)) saveIncorrect(newId,data.incorrectTracking);
+        saveSets(existing);
         showHomeMsg(`✓ Created "${name}" with ${data.questions.length} question(s).`,true);
       } else throw new Error();
       renderSetsGrid();
     }catch(err){ showHomeMsg('✗ Invalid file.',false); }
+    evt.target.value='';
+  };
+  reader.readAsText(file);
+}
+function exportFullBackup(){
+  const sets=loadSets(), folders=loadFolders(), gridOrder=loadGridOrder();
+  // Collect quiz settings from DOM
+  const settings={
+    shuffle:document.getElementById('settShuffle').checked,
+    shuffleOpts:document.getElementById('settShuffleOpts').checked,
+    feedback:document.getElementById('settFeedback').checked,
+    explain:document.getElementById('settExplain').checked,
+    flaggedOnly:document.getElementById('settFlaggedOnly').checked,
+    qTimer:document.getElementById('settQTimer').value,
+    autoAdvance:document.getElementById('settAutoAdvance').checked,
+    qLimit:document.getElementById('settQLimit').value
+  };
+  const payload={
+    type:'fullbackup', version:4,
+    exported:new Date().toISOString(),
+    settings,
+    gridOrder,
+    folders,
+    sets:sets.map(s=>({
+      id:s.id, name:s.name, folderId:s.folderId||null, created:s.created,
+      questions:loadQs(s.id),
+      flaggedKeys:loadFlags(s.id),
+      incorrectTracking:loadIncorrect(s.id)
+    }))
+  };
+  dlBlob(JSON.stringify(payload,null,2),`quizforge-backup-${new Date().toISOString().slice(0,10)}.json`);
+  showHomeMsg('✓ Full backup exported.',true);
+}
+function importFullBackup(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(data.type!=='fullbackup') throw new Error('Not a full backup file. Use Import Set(s) instead.');
+      if(!confirm('This will REPLACE all your current data with the backup. Are you sure?')){ evt.target.value=''; return; }
+      // Clear everything
+      const oldSets=loadSets();
+      oldSets.forEach(s=>{ localStorage.removeItem('qforge_qs_'+s.id); localStorage.removeItem('qforge_flags_'+s.id); localStorage.removeItem('qforge_incorrect_'+s.id); });
+      // Restore folders
+      saveFolders(Array.isArray(data.folders)?data.folders:[]);
+      // Restore sets
+      const newSets=[];
+      if(Array.isArray(data.sets)){
+        data.sets.forEach(sd=>{
+          newSets.push({id:sd.id,name:sd.name,folderId:sd.folderId||null,created:sd.created||Date.now()});
+          saveQs(sd.id,Array.isArray(sd.questions)?sd.questions:[]);
+          saveFlags(sd.id,Array.isArray(sd.flaggedKeys)?sd.flaggedKeys:[]);
+          if(Array.isArray(sd.incorrectTracking)) saveIncorrect(sd.id,sd.incorrectTracking);
+        });
+      }
+      saveSets(newSets);
+      // Restore grid order
+      if(Array.isArray(data.gridOrder)) saveGridOrder(data.gridOrder);
+      // Restore settings
+      if(data.settings){
+        const s=data.settings;
+        const set=(id,val)=>{ const el=document.getElementById(id); if(el) typeof val==='boolean'?el.checked=val:el.value=val; };
+        set('settShuffle',s.shuffle); set('settShuffleOpts',s.shuffleOpts);
+        set('settFeedback',s.feedback); set('settExplain',s.explain);
+        set('settFlaggedOnly',s.flaggedOnly); set('settQTimer',s.qTimer||'0');
+        set('settAutoAdvance',s.autoAdvance); set('settQLimit',s.qLimit||'0');
+      }
+      showHomeMsg(`✓ Backup restored — ${newSets.length} set(s) loaded.`,true);
+      renderSetsGrid();
+    }catch(err){ showHomeMsg('✗ '+err.message,false); }
     evt.target.value='';
   };
   reader.readAsText(file);
@@ -1354,7 +1773,7 @@ function showResults(){
   const incCount=loadIncorrect(activeSetId).length;
   const incBtn=document.getElementById('retakeIncorrectBtn');
   if(incBtn) incBtn.style.display=incCount?'inline-flex':'none';
-  if(incBtn) incBtn.textContent=`📖 Review (${incCount})`;
+  if(incBtn) incBtn.textContent=`❌ Review (${incCount})`;
   const flagged=quiz.questions.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
@@ -1406,7 +1825,7 @@ function showPartialResults(){
   document.getElementById('rTime').textContent=`${m}m ${s}s`;
   const incCount=loadIncorrect(activeSetId).length;
   const incBtn=document.getElementById('retakeIncorrectBtn');
-  if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`📖 Review (${incCount})`; }
+  if(incBtn){ incBtn.style.display=incCount?'inline-flex':'none'; incBtn.textContent=`❌ Review (${incCount})`; }
   const flagged=attempted.filter(isFlagged);
   const sec=document.getElementById('flaggedSection');
   if(flagged.length){
