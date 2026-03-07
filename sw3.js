@@ -1,4 +1,4 @@
-const CACHE = 'quizforge-v6';
+const CACHE = 'quizforge-v7';
 const ASSETS = [
   './index.html',
   './styles.css',

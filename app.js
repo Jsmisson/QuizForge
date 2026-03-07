@@ -2,7 +2,7 @@
 //  MODAL SYSTEM — scroll lock + swipe to dismiss
 // ═══════════════════════════════════════════════════
 let _scrollY=0;
-const APP_VERSION = '1.02';
+const APP_VERSION = '1.03';
 const INSTALL_DISMISS_KEY = 'qforge_install_dismissed_at';
 const INSTALL_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 let _activeModalTrigger = null;
@@ -134,7 +134,7 @@ function exitWithoutResultsFromExit(){ modalClose('exitQuizModal'); endQuiz(); }
 function startQuizFromSettings(){ saveQuizSettings(); closePreQuizModal(); startQuiz(); }
 function openBackupFromImportExport(){ closeImportExportModal(); openBackupModal(); }
 function openExportFromBackup(){ closeBackupModal(); openExportModal(); }
-function exportFullBackupFromBackup(){ closeBackupModal(); exportFullBackup(); }
+function exportFullBackupFromBackup(){ const ok = exportFullBackup(); if(ok !== false) closeBackupModal(); }
 function importBankFromBackup(event){ closeBackupModal(); importBank(event); }
 function importFullBackupFromBackup(event){ closeBackupModal(); importFullBackup(event); }
 function clearLocalAndResyncFromBackup(){ closeBackupModal(); clearLocalAndResync(); }
@@ -1479,17 +1479,18 @@ function importBank(evt){
 }
 function exportFullBackup(){
   const sets=loadSets(), folders=loadFolders(), gridOrder=loadGridOrder();
+  const byId = (id) => document.getElementById(id);
   const settings={
-    shuffle:document.getElementById('settShuffle').checked,
-    shuffleOpts:document.getElementById('settShuffleOpts').checked,
-    feedback:document.getElementById('settFeedback').checked,
-    explain:document.getElementById('settExplain').checked,
-    flaggedOnly:document.getElementById('settFlaggedOnly').checked,
-    qTimer:document.getElementById('settQTimer').value,
-    autoAdvance:document.getElementById('settAutoAdvance').checked,
-    qLimit:document.getElementById('settQLimit').value,
-    cardFirst:document.getElementById('settCardFirst').value,
-    cardsOnly:document.getElementById('settCardsOnly').checked
+    shuffle:!!byId('settShuffle')?.checked,
+    shuffleOpts:!!byId('settShuffleOpts')?.checked,
+    feedback:!!byId('settFeedback')?.checked,
+    explain:!!byId('settExplain')?.checked,
+    flaggedOnly:!!byId('settFlaggedOnly')?.checked,
+    qTimer:byId('settQTimer')?.value || '0',
+    autoAdvance:!!byId('settAutoAdvance')?.checked,
+    qLimit:byId('settQLimit')?.value || '0',
+    cardFirst:byId('settCardFirst')?.value || 'term',
+    cardsOnly:!!byId('settCardsOnly')?.checked
   };
   // Collect all imageRefs across all sets and bundle blobs from session cache
   const allSetsData = sets.map(s=>({
@@ -1510,6 +1511,7 @@ function exportFullBackup(){
   };
   dlBlob(JSON.stringify(payload,null,2),`quizforge-backup-${new Date().toISOString().slice(0,10)}.json`);
   showHomeMsg(`✓ Full backup exported (${allRefs.length} image(s) included).`,true);
+  return true;
 }
 function importFullBackup(evt){
   const file=evt.target.files[0]; if(!file) return;
@@ -1561,11 +1563,18 @@ function importFullBackup(evt){
 }
 function dlBlob(content,filename){
   const blob=new Blob([content],{type:'application/json'}), url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=filename;
-  // iOS Safari requires the element to be in the DOM before .click() works
-  a.style.display='none'; document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=filename;
+  a.rel='noopener';
+  a.style.display='none';
+  document.body.appendChild(a);
+  try {
+    a.click();
+  } catch (e) {
+    a.dispatchEvent(new MouseEvent('click', { bubbles:true, cancelable:true, view:window }));
+  }
+  setTimeout(()=>{ if(a.parentNode) document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
 // ═══════════════════════════════════════════════════
@@ -2888,3 +2897,4 @@ const GDRIVE = (() => {
 
   return { signIn, signOut, syncNow, initSync, _renderBar };
 })();
+window.GDRIVE = GDRIVE;
