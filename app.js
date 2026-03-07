@@ -2499,9 +2499,7 @@ const GDRIVE = (() => {
   }
 
   function signOut(){
-    if(!confirm('Sign out of Google Drive?
-
-Your data will remain on this device but will no longer sync.')) return;
+    if(!confirm('Sign out of Google Drive?\n\nYour data will remain on this device but will no longer sync.')) return;
     const oldToken = _token;
     clearTimeout(_refreshTimer);
     _refreshTimer = null;
