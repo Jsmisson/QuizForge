@@ -2,7 +2,7 @@
 //  MODAL SYSTEM — scroll lock + swipe to dismiss
 // ═══════════════════════════════════════════════════
 let _scrollY=0;
-const APP_VERSION = '1.03';
+const APP_VERSION = '1.04';
 const INSTALL_DISMISS_KEY = 'qforge_install_dismissed_at';
 const INSTALL_DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 let _activeModalTrigger = null;
@@ -2499,12 +2499,28 @@ const GDRIVE = (() => {
   }
 
   function signOut(){
-    if(!confirm('Sign out of Google Drive?\n\nYour data will remain on this device but will no longer sync.')) return;
-    if(_token) google.accounts.oauth2.revoke(_token, () => {});
+    if(!confirm('Sign out of Google Drive?
+
+Your data will remain on this device but will no longer sync.')) return;
+    const oldToken = _token;
+    clearTimeout(_refreshTimer);
+    _refreshTimer = null;
+    clearTimeout(_syncTimeout);
+    _syncTimeout = null;
     _token = null; _fileId = null; _userProfile = null;
     localStorage.removeItem('qforge_gdrive_token');
+    localStorage.removeItem('qforge_gdrive_token_expiry');
     localStorage.removeItem('qforge_gdrive_profile');
-    _renderBar();
+    try{ google?.accounts?.id?.disableAutoSelect?.(); } catch(_){}
+    if(oldToken && google?.accounts?.oauth2?.revoke){
+      google.accounts.oauth2.revoke(oldToken, () => {
+        _setStatus('Signed out', 'ok');
+        _renderBar();
+      });
+    } else {
+      _setStatus('Signed out', 'ok');
+      _renderBar();
+    }
   }
 
   async function _fetchProfile(){
