@@ -1,0 +1,32 @@
+{
+  "name": "QuizForge",
+  "short_name": "QuizForge",
+  "description": "QuizForge is an offline-capable flashcard and quiz study app with folders, import and export, flags, and review tools.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0c12",
+  "theme_color": "#0a0c12",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

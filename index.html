@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="QuizForge is an offline-capable flashcard and quiz study app with folders, import and export, flags, and review tools.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="QuizForge">
+<meta name="theme-color" content="#0a0c12">
+<title>QuizForge</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0c12'/><text x='16' y='23' font-size='20' text-anchor='middle' font-family='sans-serif' fill='%2300e5ff'>Q</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<noscript><div style="padding:16px;color:#fff;background:#111520">QuizForge requires JavaScript to run.</div></noscript>
+<div id="app">
+
+  <!-- OFFLINE BADGE -->
+  <div id="offlineBadge">⚠ Offline</div>
+
+  <!-- INSTALL BANNER -->
+  <div id="installBanner" role="region" aria-label="Install app banner">
+    <p>📱 <strong>Add to Home Screen</strong> for the full app experience — works offline too.</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" data-action="triggerInstall" aria-label="Install app" title="Install app">Install</button>
+      <button class="btn btn-ghost btn-sm" data-action="dismissInstall" aria-label="Dismiss install banner" title="Dismiss install banner">✕</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-wrap">
+      <div style="display:flex;align-items:baseline;gap:7px">
+        <div class="logo" data-action="goHome" role="button" tabindex="0" aria-label="Go to home" title="Go to home">Quiz<span>Forge</span></div>
+        <span style="font-size:.65rem;font-weight:600;color:var(--muted);letter-spacing:.5px" id="appVersionLabel">v1.03</span>
+      </div>
+      <div id="syncStrip" data-action="openImportExportModal" role="button" tabindex="0" aria-label="Open sync and import or export tools" title="Open sync and import or export tools">
+        <div class="sstrip-dot" id="sstripDot"></div>
+        <span class="sstrip-status" id="sstripStatus">Syncing…</span>
+      </div>
+    </div>
+    <div class="header-actions" id="headerRight"></div>
+  </header>
+
+  <!-- ═══ SETS HOME ═══ -->
+  <div id="view-home" class="view active">
+    <div class="sets-header">
+      <div class="sets-header-actions">
+        <div style="position:relative;display:inline-block">
+          <button class="btn btn-ghost btn-sm" data-action="toggleHomeMenu" data-action-args="event" aria-label="Open menu" title="Open menu">⚙ Menu</button>
+          <div id="homeMenu" style="display:none;position:absolute;left:50%;transform:translateX(-50%);top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:6px;min-width:190px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+            <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" data-action="openOrganizeFromHomeMenu">⠿ Organize</button>
+            <button class="btn btn-ghost btn-sm" style="width:100%;text-align:left;padding:10px 12px;border-radius:8px" data-action="openBackupFromHomeMenu">📦 Backup</button>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px">
+              <span style="font-size:.82rem">🔊 Sound</span>
+              <label class="toggle" style="margin:0"><input type="checkbox" id="menuSound" data-change-action="toggleSound"><span class="toggle-slider"></span></label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px">
+              <span style="font-size:.82rem">📅 Due Badges</span>
+              <label class="toggle" style="margin:0"><input type="checkbox" id="menuDueBadges" data-change-action="toggleDueBadges"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-ghost-accent btn-sm" data-action="openQuick10Modal" aria-label="Open Quick 10 quiz options" title="Open Quick 10 quiz options">⚡ Quick 10</button>
+        <button class="btn btn-primary btn-sm" data-action="openQuizOptsModal" aria-label="Open quiz options" title="Open quiz options">▶ Quiz</button>
+      </div>
+    </div>
+    <div id="homeMsg" class="notice" style="display:none;margin-bottom:12px"></div>
+    <div class="sets-grid" id="setsGrid"></div>
+  </div>
+
+  <!-- ═══ INNER APP ═══ -->
+  <div id="innerApp" style="display:none">
+    <div class="breadcrumb" style="margin-bottom:14px">
+      <span style="cursor:pointer" data-action="goHome">Sets</span>
+      <span class="sep">›</span>
+      <span class="set-name" id="bcSetName"></span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-action="showView" data-action-args="'manage'" aria-label="Change view" title="Change view">📋 Questions</button>
+      <button class="tab" data-action="showView" data-action-args="'add'" aria-label="Change view" title="Change view">➕ Add</button>
+      <button class="tab" data-action="showView" data-action-args="'import'" aria-label="Change view" title="Change view">📥 Import</button>
+      <button class="tab" data-action="showView" data-action-args="'settings'" aria-label="Change view" title="Change view">⚙️ Settings</button>
+    </div>
+
+    <!-- MANAGE -->
+    <div id="view-manage" class="view active">
+      <div class="card">
+        <div class="manage-top">
+          <div class="card-title" style="margin:0">Questions (<span id="qCount">0</span>)</div>
+          <div class="filter-chips">
+            <button class="chip active" id="chipAll" data-action="setFilter" data-action-args="'all'">All</button>
+            <button class="chip" id="chipFlagged" data-action="setFilter" data-action-args="'flagged'">🚩 (<span id="flagCount">0</span>)</button>
+            <button class="chip" id="chipIncorrect" data-action="setFilter" data-action-args="'incorrect'">❌ (<span id="incorrectCount">0</span>)</button>
+          </div>
+        </div>
+        <div id="qList" class="q-list"></div>
+      </div>
+    </div>
+
+    <!-- ADD -->
+    <div id="view-add" class="view">
+      <div class="card">
+        <div class="card-title">Add New Question</div>
+        <div class="q-form">
+          <div>
+            <label for="newQType">Question Type</label>
+            <select id="newQType" name="newQType" data-change-action="updateOptionControls">
+              <option value="single">Single answer (pick 1)</option>
+              <option value="multi">Multiple answers (pick 2+)</option>
+              <option value="card">Flashcard (term / definition)</option>
+            </select>
+          </div>
+          <div id="newQTextWrap"><label for="newQText">Question Text</label><textarea id="newQText" name="newQText" placeholder="Enter your question..." rows="3"></textarea></div>
+          <!-- MC fields -->
+          <div id="newQMcFields">
+            <div>
+              <div class="q-form-label">Answer Choices <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">(check correct)</span></div>
+              <div class="options-builder" id="optionsBuilder"></div>
+              <button class="add-option-btn" data-action="addOptionRow" style="margin-top:10px;width:100%">+ Add Option</button>
+            </div>
+          </div>
+          <!-- Flashcard fields -->
+          <div id="newQCardFields" style="display:none">
+            <div><label for="newQTerm">Term</label><textarea id="newQTerm" name="newQTerm" placeholder="Term or concept..." rows="2"></textarea></div>
+            <div style="margin-top:10px"><label for="newQDef">Definition</label><textarea id="newQDef" name="newQDef" placeholder="Definition or explanation..." rows="3"></textarea></div>
+          </div>
+          <div><label for="newQExplain">Explanation (optional)</label><input type="text" id="newQExplain" name="newQExplain" placeholder="Shown after answering..."></div>
+          <div>
+            <label for="newQImgUpload">Image (optional)</label>
+            <div id="newQImgPreview" class="img-preview-wrap" style="display:none">
+              <img id="newQImgThumb" src="" alt="Question image">
+              <button type="button" class="img-remove-btn" data-action="removeNewQImg" title="Remove image">✕</button>
+            </div>
+            <label class="img-upload-area" id="newQImgUploadArea" for="newQImgUpload">
+              🖼 Click to attach an image
+              <input type="file" id="newQImgUpload" name="newQImgUpload" accept="image/*" style="display:none" data-change-action="handleNewQImg">
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" data-action="saveQuestion">Save Question</button>
+            <button class="btn btn-ghost" data-action="cancelEdit" aria-label="Cancel edit" title="Cancel edit">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORT -->
+    <div id="view-import" class="view">
+      <div class="card">
+        <div class="card-title">Import into "<span id="importSetName"></span>"</div>
+        <div class="import-format">
+<span class="hl">Q:</span> Question text<br>
+<span class="hl2">A:</span> Option &nbsp;<span class="hl2">*B:</span> Correct &nbsp;<span class="hl2">C:</span> Option<br>
+<span class="hl">EXPLAIN:</span> Explanation text<br>
+<span style="color:var(--border)">───</span><br>
+<span class="hl" style="color:#34d399">CARD:</span> Term text<br>
+<span class="hl2" style="color:#34d399">DEF:</span> Definition text<br>
+<span style="color:var(--border)">───</span><br>
+<span style="font-size:.65rem;color:var(--muted)">Also: Q1: Q42: [MULTI] (Select two) [SIMULATION]</span>
+        </div>
+        <textarea class="import-area" id="importText" placeholder="Paste questions here..."></textarea>
+        <div class="import-actions">
+          <button class="btn btn-primary" data-action="importQuestions">Import</button>
+          <button class="btn btn-ghost" data-action="clearImportText">Clear</button>
+        </div>
+        <div id="importMsg" class="notice" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="view-settings" class="view">
+      <div class="card">
+        <div class="card-title" style="margin-bottom:6px">Quiz Options</div>
+        <button class="btn btn-ghost" style="width:100%" data-action="openPreQuizModal">▶ Start Quiz / Options</button>
+      </div>
+      <div class="card">
+        <div class="card-title">This Set</div>
+        <div class="settings-row">
+          <div><div class="s-lbl">Rename</div></div>
+          <div style="display:flex;gap:8px;align-items:center;flex:1;max-width:280px">
+            <input type="text" id="renameInput" style="flex:1;min-height:var(--tap);background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.88rem;padding:8px 12px;outline:none" placeholder="Set name...">
+            <button class="btn btn-ghost btn-sm" data-action="renameCurrentSet">Save</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <div><div class="s-lbl">Folder</div><div class="s-desc">Organise this set into a folder</div></div>
+          <select id="setFolderSelect" data-change-action="assignSetFolder" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:6px 10px;outline:none;min-height:36px">
+            <option value="">— No folder —</option>
+          </select>
+        </div>
+        <div class="settings-row"><div><div class="s-lbl">Export This Set</div></div><button class="btn btn-ghost btn-sm" data-action="exportCurrentSet">⬇ Export</button></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Danger Zone</div>
+        <div class="danger-row">
+          <button class="btn btn-danger btn-sm" data-action="clearAllQuestions">🗑 Clear Questions</button>
+          <button class="btn btn-ghost-yellow btn-sm" data-action="clearAllFlags">🚩 Clear Flags</button>
+          <button class="btn btn-ghost-red btn-sm" data-action="clearIncorrect">❌ Clear Incorrect</button>
+          <button class="btn btn-danger btn-sm" data-action="deleteCurrentSet">✕ Delete Set</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ -->
+    <div id="view-quiz" class="view">
+      <div class="quiz-header">
+        <button class="btn btn-ghost btn-sm" data-action="openExitQuizModal">← Exit</button>
+        <div class="progress-bar-wrap">
+          <div class="progress-label">
+            <span id="progressLabel">Q 1 of 10</span>
+            <span id="quizSetName" style="color:var(--accent);font-size:.65rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;display:none"></span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <div class="timer-box" id="overallBox" style="padding:4px 8px;gap:4px"><span class="t-lbl">⏱</span><span class="t-val" id="overallVal" style="font-size:.78rem;font-family:'JetBrains Mono',monospace">00:00</span></div>
+          <div class="q-ring-wrap" id="qTimerWrap" style="display:none">
+            <div class="q-ring" style="width:36px;height:36px">
+              <svg width="36" height="36" viewBox="0 0 44 44">
+                <circle class="r-bg" cx="22" cy="22" r="18"/>
+                <circle class="r-fill" id="ringFill" cx="22" cy="22" r="18" stroke-dasharray="113.1" stroke-dashoffset="0"/>
+              </svg>
+              <div class="r-txt" id="ringTxt" style="font-size:.62rem">60</div>
+            </div>
+          </div>
+          <div id="scoreBadgeWrap" style="display:flex;gap:4px;align-items:center">
+            <div class="score-badge">✓ <span id="scoreDisplay">0</span></div>
+            <div class="score-badge" style="background:rgba(255,82,82,.1);color:var(--red);border-color:rgba(255,82,82,.25)">✗ <span id="wrongDisplay">0</span></div>
+          </div>
+          <button class="btn btn-flag" id="flagBtn" data-action="toggleFlag" style="padding:5px 9px;font-size:.75rem;min-height:0" aria-label="Flag question for review" title="Flag question for review">🚩</button>
+        </div>
+      </div>
+      <div class="question-card anim" id="questionCard">
+        <div class="question-text" id="questionText"></div>
+        <img id="questionImg" class="question-img" src="" alt="" style="display:none">
+        <div class="question-hint" id="questionHint" style="display:none"></div>
+        <div class="choices" id="choicesList"></div>
+        <div class="feedback-box" id="feedbackBox">
+          <div class="fb-title" id="fbTitle"></div>
+          <div class="fb-explain" id="fbExplain"></div>
+        </div>
+      </div>
+      <div class="quiz-footer">
+        <span class="quiz-footer-hint" id="selHint"></span>
+        <button class="btn btn-primary submit-btn" id="submitBtn" data-action="submitAnswer">Submit Answer</button>
+      </div>
+      <div class="hotkey-legend" id="hotkeyLegend">
+        <span class="hk"><kbd>1</kbd>–<kbd>9</kbd> Select answer</span>
+        <span class="hk"><kbd>Space</kbd> Submit / Next</span>
+        <span class="hk"><kbd>F</kbd> Flag</span>
+        <span class="hk"><kbd>Esc</kbd> Exit</span>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="view-results" class="view">
+      <div class="card results-card">
+        <div class="result-score" id="resultScore"></div>
+        <div class="result-label" id="resultLabel"></div>
+        <div class="result-stats">
+          <div class="stat-box"><div class="stat-val" id="rCorrect" style="color:var(--green)">0</div><div class="stat-lbl">Correct</div></div>
+          <div class="stat-box"><div class="stat-val" id="rWrong" style="color:var(--red)">0</div><div class="stat-lbl">Wrong</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTimeout" style="color:var(--orange)">0</div><div class="stat-lbl">Timeout</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTotal">0</div><div class="stat-lbl">Total</div></div>
+          <div class="stat-box"><div class="stat-val" id="rTime" style="color:var(--accent)">—</div><div class="stat-lbl">Time</div></div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-primary" data-action="startQuiz">🔄 Retake</button>
+          <button class="btn btn-ghost-red" id="retakeIncorrectBtn" data-action="startIncorrectQuiz" style="display:none">❌ Review</button>
+          <button class="btn btn-ghost-red" id="viewIncorrectBtn" data-action="toggleIncorrectReview" style="display:none">📋 View Incorrect</button>
+          <button class="btn btn-ghost" data-action="backFromQuizSource">📋 Questions</button>
+          <button class="btn btn-ghost" data-action="goHome" aria-label="Go to home" title="Go to home">⊞ Sets</button>
+        </div>
+        <div id="incorrectReviewSection" class="review-section" style="display:none">
+          <div class="review-section-title">✗ Incorrect Answers</div>
+          <div id="incorrectReviewList"></div>
+        </div>
+        <div id="flaggedSection" style="display:none" class="flagged-section">
+          <div class="flagged-section-title">🚩 Flagged for Review</div>
+          <div id="flaggedList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /innerApp -->
+</div><!-- /app -->
+
+<!-- ORGANIZE MODAL -->
+<div class="modal-overlay" id="organizeModal" style="display:none" data-action="closeOrganizeModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:460px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">⠿ Organize</div>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:14px">Drag to reorder folders and sets, or use the arrows.</p>
+    <div id="organizeList" style="display:flex;flex-direction:column;gap:6px;max-height:55vh;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-action="closeOrganizeModal">Cancel</button>
+      <button class="btn btn-primary" data-action="saveOrganize">Save Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE SET MODAL -->
+<div class="modal-overlay" id="createSetModal" style="display:none" data-action="closeCreateSetModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:420px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">➕ New Set</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:4px">
+      <div>
+        <label for="newSetName" style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Set Name</label>
+        <input type="text" id="newSetName" name="newSetName" placeholder="e.g. Network+, CompTIA Security+" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+      </div>
+      <div>
+        <label for="newSetFolder" style="font-size:.78rem;color:var(--muted);display:block;margin-bottom:6px">Folder (optional)</label>
+        <select id="newSetFolder" name="newSetFolder" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.9rem;padding:10px 12px;outline:none;min-height:var(--tap)">
+          <option value="">— No folder —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:.72rem" data-action="openFolderManagerModal">📁 Manage Folders</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-action="closeCreateSetModal">Cancel</button>
+      <button class="btn btn-primary" data-action="confirmCreateSet">Create Set</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOLDER MANAGER MODAL -->
+<div class="modal-overlay" id="folderManagerModal" style="display:none" data-action="closeFolderManagerModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:420px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">📁 Manage Folders</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="newFolderName" placeholder="New folder name..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.88rem;padding:8px 12px;outline:none;min-height:var(--tap)">
+      <button class="btn btn-primary btn-sm" data-action="addFolder">Add</button>
+    </div>
+    <div id="folderList" style="display:flex;flex-direction:column;gap:8px;max-height:40vh;overflow-y:auto;margin-bottom:12px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" data-action="closeFolderManagerModal">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXIT QUIZ MODAL -->
+<div class="modal-overlay" id="exitQuizModal" style="display:none;touch-action:auto" data-action="closeExitQuizModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0" aria-label="Close exit quiz dialog" title="Close exit quiz dialog">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:400px;animation:none;transition:none;touch-action:auto" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">Exit Quiz?</div>
+    <div id="exitQuizSummary" style="margin-bottom:18px"></div>
+    <div class="modal-footer" style="flex-direction:column;gap:10px">
+      <button class="btn btn-ghost-green" style="width:100%" data-action="saveAndShowResultsFromExit" aria-label="Close dialog" title="Close dialog">📊 Save &amp; See Results</button>
+      <button class="btn btn-danger" style="width:100%" data-action="exitWithoutResultsFromExit" aria-label="Close dialog" title="Close dialog">✕ Exit Without Results</button>
+      <button class="btn btn-ghost" style="width:100%" data-action="modalClose" data-action-args="'exitQuizModal'" aria-label="Close dialog" title="Close dialog">↩ Keep Going</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRE-QUIZ / OPTIONS MODAL (unified) -->
+<div class="modal-overlay" id="preQuizModal" style="display:none" data-action="closePreQuizModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0" aria-label="Close quiz settings" title="Close quiz settings">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:480px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">▶ Start Quiz</div>
+
+    <!-- Question count summary -->
+    <div id="preQuizSummary" style="margin-bottom:16px"></div>
+
+    <!-- Core options always visible -->
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Questions</div></div><label class="toggle"><input type="checkbox" id="settShuffle" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Shuffle Answer Choices</div></div><label class="toggle"><input type="checkbox" id="settShuffleOpts" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Question Limit</div><div class="s-desc">0 = all questions</div></div><input type="number" id="settQLimit" value="0" min="0" max="999" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+    <div class="settings-row"><div><div class="s-lbl">Instant Feedback</div></div><label class="toggle"><input type="checkbox" id="settFeedback" checked><span class="toggle-slider"></span></label></div>
+    <div class="settings-row"><div><div class="s-lbl">Flagged Only</div><div class="s-desc">Restrict to flagged questions</div></div><label class="toggle"><input type="checkbox" id="settFlaggedOnly" data-change-action="openPreQuizModal"><span class="toggle-slider"></span></label></div>
+
+    <!-- Advanced expander -->
+    <button data-action="toggleAdvancedOpts" style="background:none;border:none;color:var(--muted);font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;cursor:pointer;padding:10px 0 6px;display:flex;align-items:center;gap:6px;width:100%">
+      <span id="advOptsCaret">▶</span> Advanced
+    </button>
+    <div id="advancedOpts" style="display:none">
+      <div class="settings-row"><div><div class="s-lbl">Show Explanation</div><div class="s-desc">Display after each answer</div></div><label class="toggle"><input type="checkbox" id="settExplain" checked><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Cards Only</div><div class="s-desc">Skip MC questions</div></div><label class="toggle"><input type="checkbox" id="settCardsOnly"><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Show First Side</div></div>
+        <select id="settCardFirst" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Sora',sans-serif;font-size:.82rem;padding:8px 10px;outline:none;min-height:var(--tap)">
+          <option value="term">Term</option>
+          <option value="definition">Definition</option>
+        </select>
+      </div>
+      <div class="settings-row"><div><div class="s-lbl">📅 Due Today Only</div><div class="s-desc">SM-2 spaced repetition</div></div><label class="toggle"><input type="checkbox" id="settSRSOnly"><span class="toggle-slider"></span></label></div>
+      <div class="settings-row"><div><div class="s-lbl">Timer per Question (s)</div><div class="s-desc">0 = disabled</div></div><input type="number" id="settQTimer" value="60" min="0" max="600" style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.9rem;padding:8px 10px;outline:none;text-align:center;min-height:var(--tap);-webkit-appearance:none"></div>
+
+    </div>
+
+    <div class="modal-footer" style="margin-top:16px">
+      <button class="btn btn-ghost" data-action="closePreQuizModal" aria-label="Close quiz settings" title="Close quiz settings">Cancel</button>
+      <button class="btn btn-primary" style="padding:12px 28px;font-size:.95rem" data-action="startQuizFromSettings">▶ Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT/EXPORT MODAL -->
+<div class="modal-overlay" id="importExportModal" style="display:none" data-action="closeImportExportModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0" aria-label="Close import and export dialog" title="Close import and export dialog">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:420px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">☁ Google Drive Sync</div>
+    <div id="syncBarWrap" style="margin-bottom:8px"></div>
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.75rem;color:var(--muted)">Backup &amp; restore your data</span>
+      <button class="btn btn-ghost btn-sm" data-action="openBackupFromImportExport" aria-label="Close import and export dialog" title="Close import and export dialog">📦 Backup / Restore</button>
+    </div>
+  </div>
+</div>
+
+<!-- BACKUP MODAL -->
+<div class="modal-overlay" id="backupModal" style="display:none" data-overlay-close="closeBackupModal" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:460px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">📦 Backup &amp; Restore</div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Export</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px">
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" data-action="openExportFromBackup" aria-label="Close backup dialog" title="Close backup dialog">
+        <div style="font-weight:700;margin-bottom:2px">📋 Export Set(s)</div>
+        <div style="font-size:.75rem;color:var(--muted)">Questions only — share with others or back up specific sets</div>
+      </button>
+      <button class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px" data-action="exportFullBackupFromBackup" aria-label="Close backup dialog" title="Close backup dialog">
+        <div style="font-weight:700;margin-bottom:2px">💾 Full Backup</div>
+        <div style="font-size:.75rem;color:var(--muted)">Everything — sets, folders, flags, incorrect tracking, order &amp; settings</div>
+      </button>
+    </div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Import</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">
+      <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:2px">📋 Import Set(s)</div>
+        <div style="font-size:.75rem;color:var(--muted)">Add sets from a .json export file</div>
+        <input type="file" id="importBankFile" name="importBankFile" accept=".json" style="display:none" data-change-action="importBankFromBackup">
+      </label>
+      <label class="btn btn-ghost" style="width:100%;text-align:left;padding:14px 16px;cursor:pointer">
+        <div style="font-weight:700;margin-bottom:2px">💾 Restore Full Backup</div>
+        <div style="font-size:.75rem;color:var(--red)">⚠ Replaces ALL current data</div>
+        <input type="file" id="importBackupFile" name="importBackupFile" accept=".json" style="display:none" data-change-action="importFullBackupFromBackup">
+      </label>
+    </div>
+
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:18px 0 8px">Troubleshooting</div>
+    <button class="btn btn-danger" style="width:100%;text-align:left;padding:14px 16px" data-action="clearLocalAndResyncFromBackup" aria-label="Close backup dialog" title="Close backup dialog">
+      <div style="font-weight:700;margin-bottom:2px">🗑 Clear Local Data &amp; Re-sync</div>
+      <div style="font-size:.75rem;opacity:.8">Wipes this device's local storage and pulls a fresh copy from Google Drive. Use if sync is stuck or quota errors persist. Does not affect Drive data.</div>
+    </button>
+  </div>
+</div>
+
+<!-- QUICK 10 MODAL -->
+<div class="modal-overlay" id="quick10Modal" style="display:none" data-overlay-close="closeQuick10Modal" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:420px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">⚡ Quick 10</div>
+    <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px">10 random questions, shuffled — no setup needed.</div>
+    <div id="quick10SetName"></div>
+
+    <div id="quick10SetSection">
+    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Set</div>
+    <div id="quick10SetList" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-action="closeQuick10Modal" aria-label="Close Quick 10 dialog" title="Close Quick 10 dialog">Cancel</button>
+      <button class="btn btn-primary" style="padding:12px 28px" data-action="startQuick10">⚡ Go</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="modal-overlay" id="exportModal" style="display:none" data-action="closeExportModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0" aria-label="Close export dialog" title="Close export dialog">
+  <div class="modal" data-action="event__stopPropagation" style="max-width:480px" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">Export Sets</div>
+    <div style="margin-bottom:14px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" data-action="exportSelectAll">Select All</button>
+      <button class="btn btn-ghost btn-sm" data-action="exportSelectNone">Clear</button>
+    </div>
+    <div id="exportSetList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;margin-bottom:16px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-action="closeExportModal" aria-label="Close export dialog" title="Close export dialog">Cancel</button>
+      <button class="btn btn-primary" data-action="exportSelected">⬇ Export Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal" style="display:none" data-action="closeEditModal" data-action-args="event" aria-hidden="true" role="button" tabindex="0">
+  <div class="modal" data-action="event__stopPropagation" role="dialog" aria-modal="true" role="button" tabindex="0">
+    <div class="modal-handle-zone"><span class="modal-handle"></span></div>
+    <div class="modal-title">Edit Question</div>
+    <div class="q-form">
+      <div><label for="editQText">Question Text</label><textarea id="editQText" name="editQText" rows="3"></textarea></div>
+      <div>
+        <label for="editQType">Answer Type</label>
+        <select id="editQType" name="editQType" data-change-action="updateEditOptionControls">
+          <option value="single">Single answer</option>
+          <option value="multi">Multiple answers</option>
+          <option value="card">Flashcard</option>
+        </select>
+      </div>
+      <!-- MC fields -->
+      <div id="editQMcFields">
+        <div>
+          <div class="q-form-label">Answer Choices</div>
+          <div class="options-builder" id="editOptionsBuilder"></div>
+          <button class="add-option-btn" data-action="addEditOptionRow" style="margin-top:10px;width:100%">+ Add Option</button>
+        </div>
+      </div>
+      <!-- Flashcard fields -->
+      <div id="editQCardFields" style="display:none">
+        <div><label for="editQTerm">Term</label><textarea id="editQTerm" name="editQTerm" rows="2"></textarea></div>
+        <div style="margin-top:10px"><label for="editQDef">Definition</label><textarea id="editQDef" name="editQDef" rows="3"></textarea></div>
+      </div>
+      <div><label for="editQExplain">Explanation (optional)</label><input type="text" id="editQExplain" name="editQExplain"></div>
+      <div>
+        <label for="editQImgUpload">Image (optional)</label>
+        <div id="editQImgPreview" class="img-preview-wrap" style="display:none">
+          <img id="editQImgThumb" src="" alt="Question image">
+          <button type="button" class="img-remove-btn" data-action="removeEditQImg" title="Remove image">✕</button>
+        </div>
+        <label class="img-upload-area" id="editQImgUploadArea" for="editQImgUpload">
+          🖼 Click to attach an image
+          <input type="file" id="editQImgUpload" name="editQImgUpload" accept="image/*" style="display:none" data-change-action="handleEditQImg">
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-action="modalClose" data-action-args="'editModal'" aria-label="Close dialog" title="Close dialog">Cancel</button>
+      <button class="btn btn-primary" data-action="saveEditQuestion">Save Changes</button>
+    </div>
+  </div>
+</div>
+<script src="./app.js" defer></script>
+</body>
+</html>
