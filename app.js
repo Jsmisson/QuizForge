@@ -2370,12 +2370,17 @@ const GDRIVE = (() => {
   let _fileId = null;
   let _syncTimeout = null;
   let _userProfile = null;
+  let _lastAuthStatus = { msg: 'Sign in to sync', type: '' };
+  let _resumeReauthTimer = null;
+  let _silentReauthInFlight = false;
+  let _lastSilentReauthAt = 0;
 
   // ── UI helpers ──
   function _renderBar(){
     const wrap = document.getElementById('syncBarWrap');
     if(!wrap) return;
-    if(!_token){
+    const hasSession = !!(_token || _userProfile);
+    if(!hasSession){
       wrap.innerHTML = `
         <button id="syncSignInBtn" data-action="GDRIVE__signIn">
           <svg width="18" height="18" viewBox="0 0 24 24">
@@ -2386,45 +2391,47 @@ const GDRIVE = (() => {
           </svg>
           Sign in with Google to sync
         </button>`;
-      // Show strip as a sign-in prompt when signed out
       const strip = document.getElementById('syncStrip');
       if(strip){
         strip.classList.add('visible');
         const dot = document.getElementById('sstripDot');
         const status = document.getElementById('sstripStatus');
         if(dot) dot.className = 'sstrip-dot';
-        if(status) status.textContent = 'Sign in to sync';
+        if(status) status.textContent = _lastAuthStatus.msg || 'Sign in to sync';
       }
-    } else {
-      const name = _userProfile ? (_userProfile.name || _userProfile.email || 'Google User') : 'Signed in';
-      const pic  = _userProfile && _userProfile.picture
-        ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer" >`
-        : `<span style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#000;flex-shrink:0">${(name[0]||'G').toUpperCase()}</span>`;
-      wrap.innerHTML = `
-        <div id="syncBar">
-          ${pic}
-          <span class="sync-name">${name}</span>
-          <span class="sync-status" id="syncStatus">●&nbsp;Ready</span>
-          <button class="btn btn-ghost btn-sm" data-action="GDRIVE__syncNow" style="padding:5px 10px;font-size:.7rem">↑↓ Sync</button>
-          <button class="btn btn-ghost btn-sm" data-action="GDRIVE__signOut" style="padding:5px 10px;font-size:.7rem;color:var(--muted)">Sign out</button>
-        </div>`;
-      // Show and populate the persistent strip
-      const strip = document.getElementById('syncStrip');
-      if(strip){
-        strip.classList.add('visible');
-        const av = document.getElementById('sstripAvatar');
-        if(av) av.style.display='none';
-        const nm = document.getElementById('sstripName');
-        if(nm) nm.textContent = '';
-      }
+      return;
+    }
+
+    const name = _userProfile ? (_userProfile.name || _userProfile.email || 'Google User') : 'Google Drive';
+    const pic  = _userProfile && _userProfile.picture
+      ? `<img class="sync-avatar" src="${_userProfile.picture}" referrerpolicy="no-referrer" >`
+      : `<span style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#000;flex-shrink:0">${(name[0]||'G').toUpperCase()}</span>`;
+    const action = _token ? 'GDRIVE__syncNow' : 'GDRIVE__signIn';
+    const label = _token ? '↑↓ Sync' : '↻ Reconnect';
+    const statusMsg = _lastAuthStatus.msg || (_token ? 'Ready' : 'Sign in needed before next sync');
+    const statusType = _lastAuthStatus.type || (_token ? '' : 'err');
+    wrap.innerHTML = `
+      <div id="syncBar">
+        ${pic}
+        <span class="sync-name">${name}</span>
+        <span class="sync-status${statusType ? ' ' + statusType : ''}" id="syncStatus">●&nbsp;${statusMsg}</span>
+        <button class="btn btn-ghost btn-sm" data-action="${action}" style="padding:5px 10px;font-size:.7rem">${label}</button>
+        <button class="btn btn-ghost btn-sm" data-action="GDRIVE__signOut" style="padding:5px 10px;font-size:.7rem;color:var(--muted)">Sign out</button>
+      </div>`;
+    const strip = document.getElementById('syncStrip');
+    if(strip){
+      strip.classList.add('visible');
+      const av = document.getElementById('sstripAvatar');
+      if(av) av.style.display='none';
+      const nm = document.getElementById('sstripName');
+      if(nm) nm.textContent = '';
     }
   }
 
   function _setStatus(msg, type=''){
-    // Update status in modal bar
+    _lastAuthStatus = { msg, type };
     const el = document.getElementById('syncStatus');
     if(el){ el.textContent = '● ' + msg; el.className = 'sync-status' + (type?' '+type:''); }
-    // Update persistent strip
     const dot = document.getElementById('sstripDot');
     const txt = document.getElementById('sstripStatus');
     if(dot){ dot.className = 'sstrip-dot' + (type?' '+type:''); }
@@ -2432,70 +2439,122 @@ const GDRIVE = (() => {
   }
 
   // ── Auth ──
+  function _getLoginHint(){
+    return _userProfile?.email || '';
+  }
+
+  function _persistToken(accessToken, expiry){
+    _token = accessToken;
+    localStorage.setItem('qforge_gdrive_token', accessToken);
+    localStorage.setItem('qforge_gdrive_token_expiry', String(expiry));
+    _setStatus('Ready', '');
+    _scheduleTokenRefresh(expiry);
+    _renderBar();
+  }
+
   async function signIn(){
     if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID'){
-      alert('Google Drive sync needs a Client ID.\nSee the setup guide at the top of the sync section in index.html.');
+      alert('Google Drive sync needs a Client ID\nSee the setup guide at the top of the sync section in index.html.');
       return;
     }
     await ensureGoogleIdentityScript();
+    const loginHint = _getLoginHint();
     const client = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
+      ...(loginHint ? { login_hint: loginHint } : {}),
       callback: async (resp) => {
-        if(resp.error){ console.error('GIS error', resp); return; }
-        _token = resp.access_token;
-        // Store token with 55-minute expiry (tokens last 60min, give 5min buffer)
+        if(resp.error){
+          console.error('GIS error', resp);
+          _setStatus('Sign-in cancelled', 'err');
+          _renderBar();
+          return;
+        }
         const expiry = Date.now() + 55 * 60 * 1000;
-        localStorage.setItem('qforge_gdrive_token', _token);
-        localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
-        _scheduleTokenRefresh(expiry);
+        _persistToken(resp.access_token, expiry);
         await _fetchProfile();
         _renderBar();
         await syncNow();
       }
     });
-    client.requestAccessToken();
+    client.requestAccessToken({ prompt: 'consent' });
   }
 
   let _refreshTimer = null;
 
   function _scheduleTokenRefresh(expiryMs){
     clearTimeout(_refreshTimer);
+    if(!expiryMs || Number.isNaN(expiryMs)) return;
     const msUntilRefresh = expiryMs - Date.now() - 5 * 60 * 1000;
-    if(msUntilRefresh <= 0){ _silentReauth(); return; }
+    if(msUntilRefresh <= 0){ _silentReauth({ reason: 'expired' }); return; }
     console.log('[Sync] token refresh scheduled in', Math.round(msUntilRefresh/60000), 'min');
-    _refreshTimer = setTimeout(()=>{ console.log('[Sync] proactive token refresh'); _silentReauth(); }, msUntilRefresh);
+    _refreshTimer = setTimeout(()=>{
+      console.log('[Sync] proactive token refresh');
+      _silentReauth({ reason: 'timer' });
+    }, msUntilRefresh);
   }
 
-  function _silentReauth(){
-    if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID') return;
-    if(typeof google === 'undefined'){ setTimeout(_silentReauth, 2000); return; }
-    console.log('[Sync] attempting silent re-auth');
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPE,
-      prompt: '',
-      callback: async (resp) => {
-        if(resp.error){
-          console.warn('[Sync] silent re-auth failed:', resp.error);
-          // Silent reauth fails on iOS Safari PWA mode — fall back to showing sign-in prompt
-          _token = null;
-          localStorage.removeItem('qforge_gdrive_token');
-          localStorage.removeItem('qforge_gdrive_token_expiry');
-          _setStatus('Tap to sign in again', 'err');
-          _renderBar(); // puts UI back to sign-in state
-          return;
+  async function _silentReauth(opts = {}){
+    if(CLIENT_ID === 'QUIZFORGE_CLIENT_ID') return false;
+    if(_silentReauthInFlight) return false;
+    const now = Date.now();
+    if(now - _lastSilentReauthAt < 15000 && !opts.force) return false;
+    _lastSilentReauthAt = now;
+    try{ await ensureGoogleIdentityScript(); } catch(_) { return false; }
+    if(typeof google === 'undefined') return false;
+    _silentReauthInFlight = true;
+    console.log('[Sync] attempting silent re-auth', opts.reason || '');
+    return await new Promise((resolve) => {
+      const loginHint = _getLoginHint();
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPE,
+        prompt: '',
+        ...(loginHint ? { login_hint: loginHint } : {}),
+        callback: async (resp) => {
+          try{
+            if(resp.error){
+              console.warn('[Sync] silent re-auth failed:', resp.error);
+              _token = null;
+              localStorage.removeItem('qforge_gdrive_token');
+              localStorage.removeItem('qforge_gdrive_token_expiry');
+              _setStatus('Reconnect before next sync', 'err');
+              _renderBar();
+              resolve(false);
+              return;
+            }
+            const expiry = Date.now() + 55 * 60 * 1000;
+            _persistToken(resp.access_token, expiry);
+            console.log('[Sync] silent re-auth success');
+            if(opts.syncAfter !== false){
+              try{ await syncNow(); } catch(_){}
+            }
+            resolve(true);
+          } finally {
+            _silentReauthInFlight = false;
+          }
         }
-        _token = resp.access_token;
-        const expiry = Date.now() + 55 * 60 * 1000;
-        localStorage.setItem('qforge_gdrive_token', _token);
-        localStorage.setItem('qforge_gdrive_token_expiry', expiry.toString());
-        console.log('[Sync] silent re-auth success');
-        _scheduleTokenRefresh(expiry);
-        await syncNow();
+      });
+      try{
+        client.requestAccessToken({ prompt: '' });
+      } catch(err){
+        console.warn('[Sync] silent re-auth request failed:', err);
+        _silentReauthInFlight = false;
+        resolve(false);
       }
     });
-    client.requestAccessToken();
+  }
+
+  function _maybeRefreshOnResume(){
+    clearTimeout(_resumeReauthTimer);
+    _resumeReauthTimer = setTimeout(() => {
+      if(!_userProfile) return;
+      const expiry = parseInt(localStorage.getItem('qforge_gdrive_token_expiry') || '0', 10);
+      const nearExpiry = !expiry || (expiry - Date.now()) < 10 * 60 * 1000;
+      if(!_token || nearExpiry){
+        _silentReauth({ reason: 'resume', syncAfter: false });
+      }
+    }, 800);
   }
 
   function signOut(){
@@ -2505,11 +2564,15 @@ const GDRIVE = (() => {
     _refreshTimer = null;
     clearTimeout(_syncTimeout);
     _syncTimeout = null;
+    clearTimeout(_resumeReauthTimer);
+    _resumeReauthTimer = null;
+    _silentReauthInFlight = false;
     _token = null; _fileId = null; _userProfile = null;
+    _lastAuthStatus = { msg: 'Sign in to sync', type: '' };
     localStorage.removeItem('qforge_gdrive_token');
     localStorage.removeItem('qforge_gdrive_token_expiry');
     localStorage.removeItem('qforge_gdrive_profile');
-    try{ google?.accounts?.id?.disableAutoSelect?.(); } catch(_){}
+    try{ google?.accounts?.id?.disableAutoSelect?.(); } catch(_){ }
     if(oldToken && google?.accounts?.oauth2?.revoke){
       google.accounts.oauth2.revoke(oldToken, () => {
         _setStatus('Signed out', 'ok');
@@ -2802,7 +2865,12 @@ const GDRIVE = (() => {
   // ── Main sync — pull then push merged result ──
   let _syncing = false;
   async function syncNow(){
-    if(!_token || _syncing) return;
+    if(_syncing) return;
+    if(!_token){
+      _setStatus(_userProfile ? 'Reconnect before next sync' : 'Sign in to sync', _userProfile ? 'err' : '');
+      _renderBar();
+      return;
+    }
     _syncing = true;
     _fileId = null; // always re-lookup to avoid stale cached ID
     _setStatus('Syncing…', 'busy');
@@ -2834,13 +2902,14 @@ const GDRIVE = (() => {
         localStorage.removeItem('qforge_gdrive_token');
         localStorage.removeItem('qforge_gdrive_token_expiry');
         _setStatus('Reconnecting…', 'busy');
-        _silentReauth();
+        _renderBar();
+        _silentReauth({ reason: '401' });
       } else if(e.message && (e.message.includes('403') || e.message.includes('insufficient') || e.message.includes('authentication scopes') || e.message.includes('insufficientPermissions'))){
         // Stale token or scope mismatch — clear it and prompt fresh interactive sign-in
         _token = null;
         localStorage.removeItem('qforge_gdrive_token');
         localStorage.removeItem('qforge_gdrive_token_expiry');
-        _setStatus('Re-authorisation needed', 'err');
+        _setStatus('Reconnect before next sync', 'err');
         _renderBar();
       } else if(e.message && e.message.includes('Failed to fetch')){
         _setStatus('Offline — will retry', 'err');
@@ -2882,31 +2951,33 @@ const GDRIVE = (() => {
   // ── Init: restore token from storage and render bar ──
   async function initSync(){
     const saved = localStorage.getItem('qforge_gdrive_token');
-    const tokenExpiry = localStorage.getItem('qforge_gdrive_token_expiry');
-    // Restore cached profile immediately
+    const tokenExpiry = parseInt(localStorage.getItem('qforge_gdrive_token_expiry') || '0', 10);
     const cachedProfile = localStorage.getItem('qforge_gdrive_profile');
-    if(cachedProfile) try{ _userProfile = JSON.parse(cachedProfile); } catch(_){}
-    if(saved){
-      // Check if token is expired (tokens last ~1 hour)
-      if(tokenExpiry && Date.now() > parseInt(tokenExpiry)){
-        console.log('[Sync] stored token expired, attempting silent reauth');
-        _token = null;
-        localStorage.removeItem('qforge_gdrive_token');
-        localStorage.removeItem('qforge_gdrive_token_expiry');
-        _renderBar();
-        _silentReauth();
-        return;
-      }
-      _token = saved;
-      console.log('[Sync] restored token from storage, expiry:', new Date(parseInt(tokenExpiry||0)).toLocaleTimeString());
-      _scheduleTokenRefresh(parseInt(tokenExpiry));
-      _renderBar();
+    if(cachedProfile) try{ _userProfile = JSON.parse(cachedProfile); } catch(_){ }
+
+    if(saved && tokenExpiry && Date.now() < tokenExpiry){
+      _persistToken(saved, tokenExpiry);
+      console.log('[Sync] restored token from storage, expiry:', new Date(tokenExpiry).toLocaleTimeString());
       await _fetchProfile();
       _renderBar();
       syncNow();
+    } else if(_userProfile){
+      _token = null;
+      localStorage.removeItem('qforge_gdrive_token');
+      localStorage.removeItem('qforge_gdrive_token_expiry');
+      _setStatus('Reconnect before next sync', 'err');
+      _renderBar();
+      _silentReauth({ reason: 'init', syncAfter: false });
     } else {
+      _setStatus('Sign in to sync', '');
       _renderBar();
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') _maybeRefreshOnResume();
+    });
+    window.addEventListener('focus', _maybeRefreshOnResume);
+    window.addEventListener('online', _maybeRefreshOnResume);
   }
 
   return { signIn, signOut, syncNow, initSync, _renderBar };
