@@ -1,51 +1,57 @@
-const CACHE = 'quizforge-v5';
-const ASSETS = ['./index.html', './manifest.json', './sw3.js'];
+const CACHE = 'quizforge-v8';
+const ASSETS = [
+  './index.html',
+  './styles.css',
+  './app.js',
+  './manifest.json',
+  './sw3.js',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-512-maskable.png'
+];
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => {
-      // Cache local assets; ignore font fetch failures (network-only fallback)
-      return c.addAll(['./index.html', './manifest.json']).catch(() => {});
-    })
-  );
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', e => {
-  const url = e.request.url;
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
 
-  // Never intercept Google API calls — PATCH/POST to googleapis must go straight to network
-  if (url.includes('googleapis.com') || url.includes('accounts.google.com')) {
-    e.respondWith(fetch(e.request));
-    return;
-  }
-
-  // Network first for navigations; cache first for everything else
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('./index.html'))
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put('./index.html', copy));
+          return response;
+        })
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200 && res.type !== 'opaque') {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+
+  const url = new URL(request.url);
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request).then(cached => cached || fetch(request).then(response => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copy));
         }
-        return res;
-      }).catch(() => cached);
-    })
-  );
+        return response;
+      }))
+    );
+    return;
+  }
+
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });
