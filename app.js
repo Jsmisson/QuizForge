@@ -760,8 +760,16 @@ function deleteCurrentSet(){ if(activeSetId) deleteSet(activeSetId); }
 function startRenameCard(id){
   const nameEl=document.getElementById('sname-'+id);
   const orig=nameEl.textContent;
-  nameEl.innerHTML=`<input id="renameInput" name="renameInput" class="set-name-input" value="${esc(orig)}" onblur="finishRenameCard('${id}',this)" onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${esc(orig)}';this.blur()}">`;
-  nameEl.querySelector('input').focus();
+  nameEl.textContent='';
+  const inp=document.createElement('input');
+  inp.id='renameInput'; inp.name='renameInput'; inp.className='set-name-input'; inp.value=orig;
+  inp.addEventListener('blur',()=>finishRenameCard(id,inp));
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter') inp.blur();
+    if(e.key==='Escape'){ inp.value=orig; inp.blur(); }
+  });
+  nameEl.appendChild(inp);
+  inp.focus();
 }
 function finishRenameCard(id,inp){
   const val=inp.value.trim()||'Untitled Set';
