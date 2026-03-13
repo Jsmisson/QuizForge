@@ -2275,14 +2275,7 @@ function loadQuizSettings(){
 
 function init(){
   try{ migrateLegacy(); } catch(e){ console.log('migrate err',e); }
-  try{
-    let sets = loadSets();
-    if(!sets || !Array.isArray(sets) || sets.length===0){
-      const id = uid();
-      sets = [{id:id, name:'Default Set', created:Date.now()}];
-      saveSets(sets);
-    }
-  } catch(e){ console.log('sets init err',e); }
+  try{ loadSets(); } catch(e){ console.log('sets init err',e); }
   try{ loadQuizSettings(); } catch(e){}
   try{ _updateSoundToggle(); } catch(e){}
   try{ renderSetsGrid(); } catch(e){ console.log('grid err',e); }
