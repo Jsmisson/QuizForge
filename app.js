@@ -70,6 +70,7 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+  if(['INPUT','TEXTAREA','SELECT'].includes(event.target.tagName)) return;
   const el = event.target.closest('[data-action][role="button"]');
   if(!el) return;
   if(event.key === 'Enter' || event.key === ' '){
@@ -1084,7 +1085,9 @@ function saveEditQuestion(){
 //  IMPORT
 // ═══════════════════════════════════════════════════
 function importQuestions(){
-  const raw=document.getElementById('importText').value.trim();
+  const rawInput=document.getElementById('importText').value.trim();
+  // Ensure each CARD: line starts a new block even when pasted without blank-line separators
+  const raw=rawInput.replace(/([^\n])\r?\n(CARD:)/gi,'$1\n\n$2');
   let added=0,errors=0;
   raw.split(/\n\s*\n/).filter(b=>b.trim()).forEach(block=>{
     try{
@@ -2409,7 +2412,7 @@ const GDRIVE = (() => {
       : `<span style="width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#000;flex-shrink:0">${(name[0]||'G').toUpperCase()}</span>`;
     const action = _token ? 'GDRIVE__syncNow' : 'GDRIVE__signIn';
     const label = _token ? '↑↓ Sync' : '↻ Reconnect';
-    const statusMsg = _lastAuthStatus.msg || (_token ? 'Ready' : 'Sign in needed before next sync');
+    const statusMsg = _lastAuthStatus.msg || (_token ? 'Ready' : 'Sync paused — click Reconnect to resume');
     const statusType = _lastAuthStatus.type || (_token ? '' : 'err');
     wrap.innerHTML = `
       <div id="syncBar">
@@ -2519,7 +2522,7 @@ const GDRIVE = (() => {
               _token = null;
               localStorage.removeItem('qforge_gdrive_token');
               localStorage.removeItem('qforge_gdrive_token_expiry');
-              _setStatus('Reconnect before next sync', 'err');
+              _setStatus('Sync paused — click Reconnect to resume', 'err');
               _renderBar();
               resolve(false);
               return;
